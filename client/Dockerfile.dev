@@ -1,12 +1,27 @@
+FROM node:lts-slim AS client
 
-FROM node:22-alpine
+RUN mkdir /project
+WORKDIR /project
 
-WORKDIR /app
-
-COPY package.json ./
-
+COPY package*.json ./
 RUN npm install
 
 COPY . .
+CMD ["npm", "run", "dev"]
+
+FROM client AS dev-envs
+
+RUN <<EOF
+apt-get update
+apt-get install -y --no-install-recommends git
+EOF
+
+RUN <<EOF
+useradd -s /bin/bash -m vscode
+groupadd docker
+usermod -aG docker vscode
+EOF
+# install Docker tools (cli, buildx, compose)
+COPY --from=gloursdocker/docker / /
 
 CMD ["npm", "run", "dev"]

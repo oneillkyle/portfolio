@@ -19,3 +19,7 @@ matplotlib
 PyQt6
 keras-tuner
 tf-keras
+elasticsearch
+fastapi[standard]
+elastic-apm
+starlette
