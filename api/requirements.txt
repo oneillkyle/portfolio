@@ -1,0 +1,6 @@
+tensorflow
+elasticsearch
+fastapi[standard]
+elastic-apm
+starlette
+pydantic

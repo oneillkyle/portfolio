@@ -270,7 +270,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/tmp/nginx.conf
     environment: 
-      - FLASK_SERVER_ADDR=server:9091
+      - API_SERVER_ADDR=api:9091
       - CLIENT_SERVER_ADDR=client:3000
     command: /bin/bash -c "envsubst < /tmp/nginx.conf > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'" 
     ports:
@@ -278,7 +278,7 @@ services:
     # networks:
     #   - portfolio
     depends_on:
-      - server
+      - api
       - client
     
   client:
@@ -294,17 +294,17 @@ services:
     # networks:
     #   - portfolio
 
-  server:
+  api:
     build:
-      context: server
+      context: api
       # target: builder
     # flask requires SIGINT to stop gracefully
     # (default stop signal from Compose is SIGTERM)
     stop_signal: SIGINT
     environment:
-      - FLASK_SERVER_PORT=9091
+      - API_SERVER_ADDR=9091
     volumes:
-      - ./server:/src
+      - ./api:/src
     # networks:
     #   - portfolio
     # depends_on:

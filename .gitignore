@@ -1,1 +1,7 @@
 .env
+filebeat_ingest_data
+logstash_ingest_data
+
+ai/datasets/*
+ai/saved_models/*
+ai/training_checkpoints/*
