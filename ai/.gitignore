@@ -2,3 +2,4 @@
 datasets/*
 saved_models/*
 training_checkpoints/*
+__pycache__
