@@ -1,0 +1,50 @@
+
+import json
+import tensorflow as tf
+from tokenizers import Tokenizer
+
+# Load model and tokenizer
+model = tf.keras.models.load_model("saved_model/nq_seq2seq_model")
+tokenizer = Tokenizer.from_file("tokenizer.json")
+
+# Constants
+sequence_length = 50
+start_token = tokenizer.token_to_id("[START]")
+end_token = tokenizer.token_to_id("[END]")
+vocab_size = tokenizer.get_vocab_size()
+
+# Encode input
+def encode_input(text):
+    ids = tokenizer.encode(text).ids
+    ids = [start_token] + ids + [end_token]
+    ids = ids[:sequence_length]
+    ids += [0] * (sequence_length - len(ids))
+    return tf.convert_to_tensor([ids], dtype=tf.int32)
+
+# Greedy decoding (for demonstration)
+def predict_answer(question_text):
+    encoder_input = encode_input(question_text)
+    decoder_input = tf.convert_to_tensor([[start_token] + [0]*(sequence_length-1)], dtype=tf.int32)
+
+    for i in range(1, sequence_length):
+        predictions = model([encoder_input, decoder_input], training=False)
+        predicted_id = tf.argmax(predictions[0, i-1]).numpy()
+        if predicted_id == end_token:
+            break
+        decoder_input = tf.tensor_scatter_nd_update(
+            decoder_input,
+            indices=[[0, i]],
+            updates=[predicted_id]
+        )
+
+    token_ids = decoder_input[0].numpy()[1:i]
+    return tokenizer.decode(token_ids)
+
+# Example usage
+if __name__ == "__main__":
+    while True:
+        question = input("Ask a question (or type 'exit'): ").strip()
+        if question.lower() == "exit":
+            break
+        answer = predict_answer(question)
+        print("Answer:", answer)
