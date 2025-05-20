@@ -6,7 +6,7 @@ from tfrecord_loader import load_tfrecord
 # === Load data ===
 sequence_length = 50
 batch_size = 32
-dataset = load_tfrecord("cleaned_data.tfrecord", sequence_length=sequence_length, batch_size=batch_size)
+dataset = load_tfrecord("ai/datasets/cleaned_data.tfrecord", sequence_length=sequence_length, batch_size=batch_size)
 
 # === Define model ===
 vocab_size = 10000  # Must match the tokenizer's vocab size
@@ -34,5 +34,5 @@ model.summary()
 model.fit(dataset, epochs=10)
 
 # === Save model ===
-model.save("saved_model/nq_seq2seq_model")
-print("✅ Model saved to 'saved_model/nq_seq2seq_model'")
+model.save("api/app/saved_models/nq_model")
+print("✅ Model saved to 'api/app/saved_models/nq_model'")

@@ -80,7 +80,7 @@ def write_tfrecord_from_jsonl(jsonl_path, tokenizer, tfrecord_path="cleaned_data
 if __name__ == "__main__":
     jsonl_input_path = "ai/datasets/cleaned_nq.jsonl"
     tfrecord_output_path = "ai/datasets/cleaned_data.tfrecord"
-    tokenizer_output_path = "ai/datasets/tokenizer.json"
+    tokenizer_output_path = "api/app/tokenizers/nq_tokenizer.json"
 
     texts = load_cleaned_texts(jsonl_input_path)
     tokenizer = train_and_save_tokenizer(texts, path=tokenizer_output_path)

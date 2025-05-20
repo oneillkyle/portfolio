@@ -4,8 +4,8 @@ import tensorflow as tf
 from tokenizers import Tokenizer
 
 # Load model and tokenizer
-model = tf.keras.models.load_model("saved_model/nq_seq2seq_model")
-tokenizer = Tokenizer.from_file("tokenizer.json")
+model = tf.keras.models.load_model("api/app/saved_models/nq_model")
+tokenizer = Tokenizer.from_file("api/app/tokenizers/nq_tokenizer.json")
 
 # Constants
 sequence_length = 50
