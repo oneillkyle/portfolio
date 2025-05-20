@@ -171,3 +171,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+app/saved_models
+app/tokenizers

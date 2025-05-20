@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Module",
+            "name": "Python Debugger: Natural Questions",
             "type": "debugpy",
             "request": "launch",
             "module": "ai.models.natural_questions"

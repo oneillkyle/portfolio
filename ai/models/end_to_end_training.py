@@ -30,9 +30,17 @@ model.compile(
 
 model.summary()
 
+for (x, y) in dataset.take(1):
+    print("Input shapes:")
+    print("  Encoder:", x[0].shape)
+    print("  Decoder:", x[1].shape)
+    print("Label shape:", y.shape)
+    print("Input dtype:", x[0].dtype, x[1].dtype)
+    print("Label dtype:", y.dtype)
+    
 # === Train ===
 model.fit(dataset, epochs=10)
 
 # === Save model ===
-model.save("api/app/saved_models/nq_model")
-print("✅ Model saved to 'api/app/saved_models/nq_model'")
+model.save("api/app/saved_models/nq_model.keras")
+print("✅ Model saved to 'api/app/saved_models/nq_model.keras'")
