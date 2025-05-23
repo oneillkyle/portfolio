@@ -1,11 +1,9 @@
 
 import tensorflow as tf
 
-# Define tokenizer special tokens (adjust if needed)
 start_token = 1
-sequence_length = 50
+sequence_length = 75  # Increased from 50
 
-# Parse the TFRecord into tensors
 def parse_tfrecord(example_proto):
     feature_description = {
         "question": tf.io.VarLenFeature(tf.int64),
@@ -16,18 +14,14 @@ def parse_tfrecord(example_proto):
     a = tf.sparse.to_dense(parsed["answer"])
     return q, a
 
-# Load and batch the dataset
-def load_tfrecord(path, sequence_length=50, batch_size=32):
+def load_tfrecord(path, sequence_length=75, batch_size=32):
     def pad_sequence(q, a):
-        # Truncate to max sequence length
         q = q[:sequence_length]
         a = a[:sequence_length]
 
-        # Pad encoder and label
         q = tf.pad(q, [[0, sequence_length - tf.shape(q)[0]]])
         a = tf.pad(a, [[0, sequence_length - tf.shape(a)[0]]])
 
-        # Create decoder input from label
         decoder_input = tf.concat([[start_token], a[:-1]], axis=0)
         decoder_input = decoder_input[:sequence_length]
         decoder_input = tf.pad(decoder_input, [[0, sequence_length - tf.shape(decoder_input)[0]]])

@@ -3,12 +3,5 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python Debugger: Natural Questions",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "ai.models.natural_questions"
-        }
-    ]
+    "configurations": []
 }
