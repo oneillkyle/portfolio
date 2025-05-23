@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
-ARG PYTHON_VERSION=3.10.12
-FROM python:${PYTHON_VERSION}-slim AS base
+# ARG PYTHON_VERSION=3.10.12
+# FROM python:${PYTHON_VERSION}-slim AS base
+
+FROM tensorflow/tensorflow:latest-gpu
 
 # Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -31,11 +33,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 USER appuser
 
 # Copy the source code into the container.
-COPY . .
+COPY app ./
 
 # Expose the port that the application listens on.
-EXPOSE 5000
+EXPOSE 8000
 
 # Run the application.
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info", "--workers", "1", "--reload"]
-CMD ["fastapi", "dev", "app/main.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# CMD ["fastapi", "dev", "app/main.py"]

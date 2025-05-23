@@ -1,82 +1,55 @@
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from tokenizers import Tokenizer
 import tensorflow as tf
-import numpy as np
-
-# from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
-
-# try:
-#   apm = make_apm_client({
-#       'SERVICE_NAME': 'my_python_service',
-#       'SECRET_TOKEN': 'supersecrettoken',
-#       # SERVER_URL must be set to "fleet-server" if running as a docker container.
-#       # if running as a local python script, then set the url to "LOCALHOST"
-#       'SERVER_URL': 'http://fleet-server:8200',
-#       'ENVIRONMENT': 'development'
-#   })
-# except Exception as e:
-#   print('failed to create client')
 
 app = FastAPI()
 
-# Request model for input data
-# class InputData(BaseModel):
-#     sepal_length: float
-#     sepal_width: float
-#     petal_length: float
-#     petal_width: float
+# Load model and tokenizer
+tokenizer = Tokenizer.from_file("tokenizers/nq_tokenizer.json")
+model = tf.keras.models.load_model("saved_models/nq_model.keras")
 
-# # Load the trained TensorFlow model
-# loaded_model = tf.keras.models.load_model('saved_model/iris_model')
+sequence_length = 50
+start_token = tokenizer.token_to_id("[START]")
+end_token = tokenizer.token_to_id("[END]")
 
-# # API endpoint for model inference
-# @app.post("/predict")
-# def predict(input_data: InputData):
-#     # Convert input features to a numpy array
-#     features = np.array([
-#         [input_data.sepal_length, input_data.sepal_width, input_data.petal_length, input_data.petal_width]
-#     ])
+class QuestionRequest(BaseModel):
+    question: str
 
-#     # Perform model inference
-#     predictions = loaded_model.predict(features)
-#     predicted_class = np.argmax(predictions, axis=1)[0]
+def encode_input(text):
+    ids = tokenizer.encode(text).ids
+    ids = [start_token] + ids + [end_token]
+    ids = ids[:sequence_length]
+    ids += [0] * (sequence_length - len(ids))
+    return tf.convert_to_tensor([ids], dtype=tf.int32)
 
-#     # Map predicted class index to class label
-#     class_labels = ["Setosa", "Versicolor", "Virginica"]
-#     predicted_label = class_labels[predicted_class]
+def predict_answer(question_text):
+    encoder_input = encode_input(question_text)
+    decoder_input = tf.convert_to_tensor([[start_token] + [0] * (sequence_length - 1)], dtype=tf.int32)
 
-#     # Convert predicted class to Python integer
-#     predicted_class = int(predicted_class)
+    for i in range(1, sequence_length):
+        predictions = model([encoder_input, decoder_input], training=False)
+        predicted_id = tf.argmax(predictions[0, i - 1]).numpy()
+        if predicted_id == end_token:
+            break
+        decoder_input = tf.tensor_scatter_nd_update(
+            decoder_input,
+            indices=[[0, i]],
+            updates=[predicted_id]
+        )
 
-#     # Create the response JSON
-#     response_data = {"predicted_class": predicted_class, "predicted_label": predicted_label}
+    token_ids = decoder_input[0].numpy()[1:i]
+    return tokenizer.decode(token_ids)
 
-#     return JSONResponse(content=response_data)
+@app.post("/predict")
+async def predict(req: QuestionRequest):
+    question = req.question.strip()
+    if not question:
+        return {"error": "Empty question"}
+    answer = predict_answer(question)
+    return {"question": question, "answer": answer}
 
-# try:
-#   app.add_middleware(ElasticAPM, client=apm)
-# except Exception as e:
-#   print('failed to add APM Middleware')
-
-
-@app.get("/test/{message}")
-async def custom_message(message: str):
-    return {"message": f"Custom Message:  {message}"}
-
-
-# @app.get("/error")
-# async def throw_error():
-#     try:
-#         1 / 0
-#     except Exception as e:
-#         apm.capture_exception()
-#     return {"message": "Failed Successfully :)"}
-
-# try:
-#   apm.capture_message('App Loaded, Hello World!')
-# except Exception as e:
-#   print('error: ' + e)
 
 if __name__ == '__main__':
     print('Please start the app with the "uvicorn" command as shown in the start.sh script')

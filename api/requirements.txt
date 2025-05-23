@@ -1,6 +1,9 @@
-tensorflow
+tensorflow[and-cuda]
 elasticsearch
 fastapi[standard]
 elastic-apm
 starlette
 pydantic
+tokenizers
+uvicorn
+watchdog
