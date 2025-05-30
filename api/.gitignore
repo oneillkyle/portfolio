@@ -174,3 +174,4 @@ build/
 
 app/saved_models
 app/tokenizers
+app/tokenizer_model

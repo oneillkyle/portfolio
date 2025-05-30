@@ -1,130 +1,75 @@
+
 import json
-import re
-import html
+import random
+from pathlib import Path
+from transformers import AutoTokenizer
 import tensorflow as tf
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers, normalizers
-from tokenizers.normalizers import NFD, Lowercase, StripAccents, Sequence
-from tokenizers.pre_tokenizers import Whitespace
+from tqdm import tqdm
 
-# HTML cleaning utility
-html_tag_pattern = re.compile(r"<[^>]+>")
+INPUT_JSONL = "ai/datasets/cleaned_nq.jsonl"
+TRAIN_TFRECORD = "ai/datasets/cleaned_data.train.tfrecord"
+VAL_TFRECORD = "ai/datasets/cleaned_data.val.tfrecord"
+TOKENIZER_PATH = "ai/tokenizer_model"
+VALIDATION_SPLIT = 0.1
+MAX_LENGTH = 75
+MODEL_NAME = "bert-base-uncased"
 
-
-def clean_html(text):
-    text = html.unescape(text)
-    return re.sub(html_tag_pattern, " ", text)
-
-
-# Define filters to eliminate bad samples
-generic_answers = {
-    "yes", "no", "none", "n/a", "not available", "unknown", "inches", "centimeters", "meters"
-}
-
-bad_starts = ("is the", "was the", "has been", "it is",
-              "there are", "they are", "this is")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 
-def is_valid_pair(q, a):
-    q = q.strip()
-    a = a.strip()
-
-    if len(q) <= 3 or len(a) <= 5:
-        return False
-    if q.lower() == a.lower():
-        return False
-    if a.lower() in q.lower():
-        return False
-    if len(a.split()) < 3:
-        return False
-    if a.lower() in generic_answers:
-        return False
-    if a.lower().startswith(bad_starts):
-        return False
-    return True
-
-
-def load_cleaned_texts(jsonl_path, limit=100000):
-    texts = []
-    with open(jsonl_path, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            if limit and i >= limit:
-                break
-            try:
-                data = json.loads(line)
-                q = clean_html(data.get("question", ""))
-                a = clean_html(data.get("short_answer", "")
-                               or data.get("long_answer", ""))
-                if is_valid_pair(q, a):
-                    texts.extend([q, a])
-            except Exception:
-                continue
-    return texts
-
-
-def train_and_save_tokenizer(texts, vocab_size=10000, path="tokenizer.json"):
-    tokenizer = Tokenizer(models.WordPiece(unk_token="[UNK]"))
-    tokenizer.normalizer = Sequence([NFD(), Lowercase(), StripAccents()])
-    tokenizer.pre_tokenizer = Whitespace()
-    trainer = trainers.WordPieceTrainer(
-        vocab_size=vocab_size,
-        special_tokens=["[PAD]", "[UNK]", "[START]", "[END]"]
-    )
-    tokenizer.train_from_iterator(texts, trainer)
-    tokenizer.save(path)
-    return tokenizer
-
-
-def encode_example(q, a, tokenizer):
-    q_ids = tokenizer.encode(q).ids
-    a_ids = tokenizer.encode(a).ids
-    start = tokenizer.token_to_id("[START]")
-    end = tokenizer.token_to_id("[END]")
-    q_ids = [start] + q_ids + [end]
-    a_ids = [start] + a_ids + [end]
-
-    def _int64_feature(val):
-        return tf.train.Feature(int64_list=tf.train.Int64List(value=val))
-
-    features = {
-        "question": _int64_feature(q_ids),
-        "answer": _int64_feature(a_ids),
+def serialize_example(q_ids, a_ids):
+    feature = {
+        "question": tf.train.Feature(int64_list=tf.train.Int64List(value=q_ids)),
+        "answer": tf.train.Feature(int64_list=tf.train.Int64List(value=a_ids)),
     }
-    return tf.train.Example(features=tf.train.Features(feature=features))
+    example = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example.SerializeToString()
 
 
-def write_tfrecord_from_jsonl(jsonl_path, tokenizer, tfrecord_path="cleaned_data.tfrecord", limit=100000):
+def tokenize_pair(question, answer):
+    q_enc = tokenizer.encode(
+        question, add_special_tokens=True, truncation=True, max_length=MAX_LENGTH)
+    a_enc = tokenizer.encode(
+        answer, add_special_tokens=True, truncation=True, max_length=MAX_LENGTH)
+    return q_enc, a_enc
+
+
+def write_tfrecord(data, out_path):
     count = 0
-    with tf.io.TFRecordWriter(tfrecord_path) as writer, open(jsonl_path, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            if limit and i >= limit:
-                break
+    with tf.io.TFRecordWriter(out_path) as writer:
+        for item in tqdm(data, desc=f"Writing {out_path}"):
             try:
-                data = json.loads(line)
-                q = clean_html(data.get("question", ""))
-                a = clean_html(data.get("short_answer", "")
-                               or data.get("long_answer", ""))
-                if "is the current" in a.lower():
-                    print("⚠️ Suspicious answer:", a)
-                if is_valid_pair(q, a):
-                    print(f"[{count}]")
-                    print("Q raw:", q)
-                    print("A raw:", a)
-                    print("Q tokens:", tokenizer.encode(q).tokens)
-                    print("A tokens:", tokenizer.encode(a).tokens)
-                    example = encode_example(q, a, tokenizer)
-                    writer.write(example.SerializeToString())
-                    count += 1
-            except Exception:
-                continue
-    print(f"✅ Wrote {count} valid examples to {tfrecord_path}")
+                q, a = item.get("question"), item.get("answer")
+                if not q or not a or len(a.strip()) < 2:
+                    continue
+                q_ids, a_ids = tokenize_pair(q, a)
+                if len(q_ids) == 0 or len(a_ids) == 0:
+                    continue
+                writer.write(serialize_example(q_ids, a_ids))
+                count += 1
+            except Exception as e:
+                print(f"Skipping item due to error: {e}")
+    print(f"✅ Wrote {count} examples to {out_path}")
+
+
+def main():
+    with open(INPUT_JSONL, "r", encoding="utf-8") as f:
+        lines = [json.loads(l.strip()) for l in f if l.strip()]
+
+    random.shuffle(lines)
+    split_idx = int(len(lines) * (1 - VALIDATION_SPLIT))
+    train_data = lines[:split_idx]
+    val_data = lines[split_idx:]
+
+    print(
+        f"Total: {len(lines)} | Train: {len(train_data)} | Val: {len(val_data)}")
+    write_tfrecord(train_data, TRAIN_TFRECORD)
+    write_tfrecord(val_data, VAL_TFRECORD)
+
+    # Save tokenizer config
+    tokenizer.save_pretrained(TOKENIZER_PATH)
+    print("✅ Tokenizer saved to tokenizer_model/")
 
 
 if __name__ == "__main__":
-    jsonl_input_path = "ai/datasets/cleaned_nq.jsonl"
-    tfrecord_output_path = "ai/datasets/cleaned_data.tfrecord"
-    tokenizer_output_path = "ai/tokenizers/nq_tokenizer.json"
-
-    texts = load_cleaned_texts(jsonl_input_path)
-    tokenizer = train_and_save_tokenizer(texts, path=tokenizer_output_path)
-    write_tfrecord_from_jsonl(
-        jsonl_input_path, tokenizer, tfrecord_path=tfrecord_output_path)
+    main()

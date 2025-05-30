@@ -2,5 +2,6 @@
 datasets/*
 saved_models/*
 tokenizers/*
+tokenizer_model/*
 training_checkpoints/*
 __pycache__

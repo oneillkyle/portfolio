@@ -1,4 +1,5 @@
 
+import os
 import json
 import re
 import html
@@ -7,16 +8,25 @@ from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer, util
 from collections import Counter
 
-nltk.download('punkt')
+# Ensure nltk_data is available and punkt is downloaded
+nltk_data_dir = os.path.expanduser("~/nltk_data")
+if not os.path.exists(nltk_data_dir):
+    os.makedirs(nltk_data_dir)
 
-# HTML cleaning utility
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt", download_dir=nltk_data_dir)
+    
+nltk.download('punkt_tab', download_dir=nltk_data_dir)
+nltk.data.path.append(nltk_data_dir)
+
 html_tag_pattern = re.compile(r"<[^>]+>")
 
 def clean_html(text):
     text = html.unescape(text)
     return re.sub(html_tag_pattern, " ", text)
 
-# Load semantic similarity model
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def extract_best_sentence_bert(long_text, question):
@@ -55,6 +65,7 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
                 long_answer = annotation.get("long_answer", {})
                 short_answers = annotation.get("short_answers", [])
 
+                short, sentence = "", ""
                 answer = ""
                 answer_type = "none"
 
@@ -64,23 +75,16 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
                     end = sa.get("end_token")
                     if start is not None and end is not None:
                         short = " ".join(tokens[start:end])
-                        if retain_dual:
-                            answer = short
-                            answer_type = "short"
-                        else:
-                            answer = short.strip()
-                            answer_type = "short"
-                elif long_answer and "start_token" in long_answer and "end_token" in long_answer:
+                        answer = short.strip()
+                        answer_type = "short"
+
+                if not short and long_answer and "start_token" in long_answer and "end_token" in long_answer:
                     start = long_answer["start_token"]
                     end = long_answer["end_token"]
                     long = " ".join(tokens[start:end])
                     sentence = extract_best_sentence_bert(long, question)
-                    if retain_dual:
-                        answer = sentence
-                        answer_type = "long"
-                    else:
-                        answer = sentence.strip()
-                        answer_type = "long"
+                    answer = sentence.strip()
+                    answer_type = "long"
 
                 if len(question) > 5 and len(answer.split()) > 3 and answer.lower() not in question.lower():
                     stats["kept"] += 1
@@ -91,17 +95,21 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
                         "question": question.strip(),
                         "answer": answer.strip()
                     }
-                    if retain_dual and short_answers and long_answer:
+                    if retain_dual and short and sentence:
                         stats["both_used"] += 1
                         cleaned["short_answer"] = short.strip()
                         cleaned["long_answer"] = sentence.strip()
                     fout.write(json.dumps(cleaned) + "\n")
+                    if stats["kept"] % 100 == 0:
+                        print(f"📝 Written {stats['kept']} examples...")
                 else:
                     stats["skipped"] += 1
-            except Exception:
+            except Exception as e:
                 stats["skipped"] += 1
+                print(f"⚠️ Error at line {i}: {e}")
                 continue
 
+    fout.flush()
     print("✅ Cleaning complete.")
     print(f"Total kept: {stats['kept']}")
     print(f"Total skipped: {stats['skipped']}")
@@ -110,3 +118,21 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
     print(f"Both used (dual mode): {stats['both_used']}")
     print(f"Avg question length: {sum(stats['question_lengths']) / max(1, len(stats['question_lengths'])):.2f}")
     print(f"Avg answer length: {sum(stats['answer_lengths']) / max(1, len(stats['answer_lengths'])):.2f}")
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Clean NQ dataset using semantic matching.")
+    parser.add_argument("--input", type=str, default="simplified-nq-train.jsonl", help="Path to input JSONL file")
+    parser.add_argument("--output", type=str, default="cleaned_nq.jsonl", help="Path to output cleaned JSONL")
+    parser.add_argument("--limit", type=int, default=100000, help="Max examples to process")
+    parser.add_argument("--dual", action="store_true", help="Include both short and long answers in output")
+
+    args = parser.parse_args()
+
+    clean_nq_semantic(
+        input_path=args.input,
+        output_path=args.output,
+        limit=args.limit,
+        retain_dual=args.dual
+    )
