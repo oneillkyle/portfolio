@@ -1,4 +1,3 @@
-
 import os
 import json
 import re
@@ -17,8 +16,7 @@ try:
     nltk.data.find("tokenizers/punkt")
 except LookupError:
     nltk.download("punkt", download_dir=nltk_data_dir)
-    
-nltk.download('punkt_tab', download_dir=nltk_data_dir)
+
 nltk.data.path.append(nltk_data_dir)
 
 html_tag_pattern = re.compile(r"<[^>]+>")
@@ -58,8 +56,7 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
             try:
                 data = json.loads(line)
                 question = clean_html(data.get("question_text", ""))
-                document_text = clean_html(data.get("document_text", ""))
-                tokens = document_text.split()
+                raw_tokens = data.get("document_text", "").split()
                 annotations = data.get("annotations", [{}])
                 annotation = annotations[0]
                 long_answer = annotation.get("long_answer", {})
@@ -73,18 +70,21 @@ def clean_nq_semantic(input_path, output_path, limit=100000, retain_dual=False):
                     sa = short_answers[0]
                     start = sa.get("start_token")
                     end = sa.get("end_token")
-                    if start is not None and end is not None:
-                        short = " ".join(tokens[start:end])
+                    if start is not None and end is not None and end > start:
+                        short = " ".join(raw_tokens[start:end])
+                        short = clean_html(short)
                         answer = short.strip()
                         answer_type = "short"
 
                 if not short and long_answer and "start_token" in long_answer and "end_token" in long_answer:
                     start = long_answer["start_token"]
                     end = long_answer["end_token"]
-                    long = " ".join(tokens[start:end])
-                    sentence = extract_best_sentence_bert(long, question)
-                    answer = sentence.strip()
-                    answer_type = "long"
+                    if end > start:
+                        long = " ".join(raw_tokens[start:end])
+                        long = clean_html(long)
+                        sentence = extract_best_sentence_bert(long, question)
+                        answer = sentence.strip()
+                        answer_type = "long"
 
                 if len(question) > 5 and len(answer.split()) > 3 and answer.lower() not in question.lower():
                     stats["kept"] += 1
@@ -123,8 +123,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Clean NQ dataset using semantic matching.")
-    parser.add_argument("--input", type=str, default="simplified-nq-train.jsonl", help="Path to input JSONL file")
-    parser.add_argument("--output", type=str, default="cleaned_nq.jsonl", help="Path to output cleaned JSONL")
+    parser.add_argument("--input", type=str, default="ai/datasets/simplified-nq-train.jsonl", help="Path to input JSONL file")
+    parser.add_argument("--output", type=str, default="ai/datasets/cleaned_nq.jsonl", help="Path to output cleaned JSONL")
     parser.add_argument("--limit", type=int, default=100000, help="Max examples to process")
     parser.add_argument("--dual", action="store_true", help="Include both short and long answers in output")
 

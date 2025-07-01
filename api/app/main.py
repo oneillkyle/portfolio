@@ -4,11 +4,11 @@ from transformers import AutoTokenizer
 import tensorflow as tf
 import numpy as np
 
-MODEL_PATH = "api/saved_models/trained_nq_model.keras"
-TOKENIZER_PATH = "api/tokenizer_model"
+MODEL_PATH = "api/app/saved_models/trained_nq_model.keras"
+TOKENIZER_PATH = "api/app/tokenizer_model"
 MAX_LENGTH = 75
 
-tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
+tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH, local_files_only=True)
 model = tf.keras.models.load_model(MODEL_PATH)
 
 app = FastAPI()
@@ -24,7 +24,8 @@ async def predict_answer(payload: QARequest):
         a_input = tf.convert_to_tensor([[tokenizer.cls_token_id] + [0] * (MAX_LENGTH - 1)])
         pred = model.predict([q_input, a_input])
         pred_ids = np.argmax(pred[0], axis=-1)
-        decoded = tokenizer.decode(pred_ids, skip_special_tokens=True)
+        decoded = tokenizer.decode(pred_ids)
+        print("Predicted token IDs:", pred_ids)
         return {"answer": decoded.strip()}
     except Exception as e:
         return {"error": str(e)}

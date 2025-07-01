@@ -1,75 +1,60 @@
-
+import tensorflow as tf
 import json
 import random
-from pathlib import Path
 from transformers import AutoTokenizer
-import tensorflow as tf
-from tqdm import tqdm
 
 INPUT_JSONL = "ai/datasets/cleaned_nq.jsonl"
 TRAIN_TFRECORD = "ai/datasets/cleaned_data.train.tfrecord"
 VAL_TFRECORD = "ai/datasets/cleaned_data.val.tfrecord"
 TOKENIZER_PATH = "ai/tokenizer_model"
-VALIDATION_SPLIT = 0.1
 MAX_LENGTH = 75
-MODEL_NAME = "bert-base-uncased"
+VAL_SPLIT = 0.1
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+random.seed(42)
+tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
+CLS_ID = tokenizer.cls_token_id
+SEP_ID = tokenizer.sep_token_id
 
+examples = []
+with open(INPUT_JSONL, "r", encoding="utf-8") as f:
+    for line in f:
+        try:
+            item = json.loads(line)
+            question = item.get("question", "").strip()
+            answer = item.get("answer", "").strip()
 
-def serialize_example(q_ids, a_ids):
-    feature = {
-        "question": tf.train.Feature(int64_list=tf.train.Int64List(value=q_ids)),
-        "answer": tf.train.Feature(int64_list=tf.train.Int64List(value=a_ids)),
-    }
-    example = tf.train.Example(features=tf.train.Features(feature=feature))
-    return example.SerializeToString()
+            if not question or not answer:
+                continue
 
+            q_ids = tokenizer.encode(question, add_special_tokens=True, truncation=True, max_length=MAX_LENGTH)
+            a_ids = tokenizer.encode(answer, add_special_tokens=False, truncation=True, max_length=MAX_LENGTH - 1)
+            a_ids.append(SEP_ID)  # add [SEP] as stop token
 
-def tokenize_pair(question, answer):
-    q_enc = tokenizer.encode(
-        question, add_special_tokens=True, truncation=True, max_length=MAX_LENGTH)
-    a_enc = tokenizer.encode(
-        answer, add_special_tokens=True, truncation=True, max_length=MAX_LENGTH)
-    return q_enc, a_enc
+            examples.append((q_ids, a_ids))
 
+        except Exception as e:
+            print(f"⚠️ Skipped due to error: {e}")
 
-def write_tfrecord(data, out_path):
-    count = 0
-    with tf.io.TFRecordWriter(out_path) as writer:
-        for item in tqdm(data, desc=f"Writing {out_path}"):
-            try:
-                q, a = item.get("question"), item.get("answer")
-                if not q or not a or len(a.strip()) < 2:
-                    continue
-                q_ids, a_ids = tokenize_pair(q, a)
-                if len(q_ids) == 0 or len(a_ids) == 0:
-                    continue
-                writer.write(serialize_example(q_ids, a_ids))
-                count += 1
-            except Exception as e:
-                print(f"Skipping item due to error: {e}")
-    print(f"✅ Wrote {count} examples to {out_path}")
+print(f"✅ Loaded {len(examples)} total examples")
+random.shuffle(examples)
+val_size = int(len(examples) * VAL_SPLIT)
+val_examples = examples[:val_size]
+train_examples = examples[val_size:]
 
 
-def main():
-    with open(INPUT_JSONL, "r", encoding="utf-8") as f:
-        lines = [json.loads(l.strip()) for l in f if l.strip()]
+def write_tfrecord(examples, path):
+    with tf.io.TFRecordWriter(path) as writer:
+        for i, (q_ids, a_ids) in enumerate(examples):
+            q_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=q_ids))
+            a_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=a_ids))
+            example = tf.train.Example(features=tf.train.Features(feature={
+                "question": q_feature,
+                "answer": a_feature
+            }))
+            writer.write(example.SerializeToString())
+            if (i + 1) % 500 == 0:
+                print(f"📝 Written {i + 1} examples to {path}")
 
-    random.shuffle(lines)
-    split_idx = int(len(lines) * (1 - VALIDATION_SPLIT))
-    train_data = lines[:split_idx]
-    val_data = lines[split_idx:]
-
-    print(
-        f"Total: {len(lines)} | Train: {len(train_data)} | Val: {len(val_data)}")
-    write_tfrecord(train_data, TRAIN_TFRECORD)
-    write_tfrecord(val_data, VAL_TFRECORD)
-
-    # Save tokenizer config
-    tokenizer.save_pretrained(TOKENIZER_PATH)
-    print("✅ Tokenizer saved to tokenizer_model/")
-
-
-if __name__ == "__main__":
-    main()
+write_tfrecord(train_examples, TRAIN_TFRECORD)
+write_tfrecord(val_examples, VAL_TFRECORD)
+print(f"✅ TFRecord creation complete: {len(train_examples)} train, {len(val_examples)} validation")
