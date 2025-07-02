@@ -4,4 +4,5 @@ saved_models/*
 tokenizers/*
 tokenizer_model/*
 training_checkpoints/*
+wiki_json/*
 __pycache__

@@ -23,4 +23,9 @@ tokenizers
 sentence-transformers
 nltk
 transformers
+transformers[torch]
 seaborn
+datasets
+rouge-score
+sentencepiece
+elasticsearch
