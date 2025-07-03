@@ -4,7 +4,7 @@ from datasets import load_dataset, Dataset
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Trainer, TrainingArguments, DataCollatorForSeq2Seq
 import torch
 
-MODEL_NAME = "t5-base"
+MODEL_NAME = "ai/saved_models/t5_wiki_pretrain"
 MAX_SOURCE_LEN = 64
 MAX_TARGET_LEN = 64
 TRAIN_PATH = "ai/datasets/cleaned_nq.train.jsonl"
