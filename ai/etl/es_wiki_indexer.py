@@ -77,7 +77,7 @@ if __name__ == "__main__":
         description="Index WikiExtractor JSONL output into Elasticsearch"
     )
     parser.add_argument(
-        "--wiki_dir", type=str, required=True, default="ai/wiki_json",
+        "--wiki_dir", type=str, default="ai/wiki_json",
         help="Directory containing WikiExtractor JSONL files (any extension)"
     )
     parser.add_argument(

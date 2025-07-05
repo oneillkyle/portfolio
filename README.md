@@ -85,6 +85,11 @@ python index_wiki_passages.py   --wiki_dir data/wiki_json/   --es_host http://lo
 ### 1. **Pre-training (optional)**
 Continue pre-training T5 on Wikipedia corpus:
 
+Optionally take a subsample of the corpus for training.
+```bash
+shuf -n 1000000 ai/datasets/wiki_corpus.txt > ai/datasets/wiki_corpus.subsample.txt
+```
+
 ```bash
 python pretrain_t5_wiki.py
 # outputs → t5_wiki_pretrain/

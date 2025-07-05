@@ -4,12 +4,13 @@ from datasets import load_dataset, Dataset
 from transformers import T5Tokenizer, T5ForConditionalGeneration, Trainer, TrainingArguments, DataCollatorForSeq2Seq
 import torch
 
-MODEL_NAME = "ai/saved_models/t5_wiki_pretrain"
+MODEL_NAME = "../saved_models/t5_wiki_pretrain_fast"
 MAX_SOURCE_LEN = 64
 MAX_TARGET_LEN = 64
-TRAIN_PATH = "ai/datasets/cleaned_nq.train.jsonl"
-VAL_PATH = "ai/datasets/cleaned_nq.val.jsonl"
-MODEL_OUT = "ai/saved_models/t5_trained_nq"
+TRAIN_PATH = "../datasets/cleaned_nq.train.jsonl"
+VAL_PATH = "../datasets/cleaned_nq.val.jsonl"
+MODEL_OUT = "../saved_models/t5_trained_nq"
+DS_CONFIG = "../../deepspeed_config.json"
 
 
 def load_jsonl(path):
@@ -56,7 +57,8 @@ def main():
         logging_dir=f"{MODEL_OUT}/logs",
         save_total_limit=2,
         load_best_model_at_end=True,
-        fp16=torch.cuda.is_available()
+        fp16=torch.cuda.is_available(),
+        deepspeed=DS_CONFIG,
     )
 
     # training_args = TrainingArguments(
