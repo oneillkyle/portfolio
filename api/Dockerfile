@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # ARG PYTHON_VERSION=3.10.12
-# FROM python:${PYTHON_VERSION}-slim AS base
+FROM python:3.14-slim
 
-FROM tensorflow/tensorflow:latest-gpu
+# FROM tensorflow/tensorflow:latest-gpu
 
 # Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -39,5 +39,5 @@ COPY app ./
 EXPOSE 8000
 
 # Run the application.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.fastapi_t5:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 # CMD ["fastapi", "dev", "app/main.py"]

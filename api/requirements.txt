@@ -8,3 +8,5 @@ tokenizers
 uvicorn
 watchdog
 transformers
+torch
+sentence-transformers

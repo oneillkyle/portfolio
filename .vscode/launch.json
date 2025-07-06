@@ -9,6 +9,12 @@
             "type": "debugpy",
             "request": "launch",
             "module": "ai.wiki_pretrain.train"
+        },
+        {
+            "name": "Python Debugger: T5 Predict",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "ai.t5.predict_t5"
         }
     ]
 }
