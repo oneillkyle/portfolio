@@ -3,10 +3,14 @@ from pydantic import BaseModel
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
+from .elastic.query import retrieve
+
 app = FastAPI()
+
 
 class QARequest(BaseModel):
     question: str
+
 
 # Load model on startup
 MODEL_DIR = "app/saved_models/t5_trained_nq"
@@ -15,10 +19,14 @@ tokenizer = T5Tokenizer.from_pretrained(MODEL_DIR)
 model = T5ForConditionalGeneration.from_pretrained(MODEL_DIR).to(DEVICE)
 model.eval()
 
-def predict(question: str, max_length: int = 64, num_beams: int = 5):
-    input_text = f"question: {question}"
+
+def predict(question: str, max_length: int = 64, num_beams: int = 5, k=3):
+    ctxs = retrieve(question, k)
+    context = " ".join(ctxs)
+    prompt = f"context: {context}  question: {question}"
+    
     inputs = tokenizer(
-        input_text,
+        prompt,
         return_tensors="pt",
         padding="max_length",
         truncation=True,
@@ -32,15 +40,17 @@ def predict(question: str, max_length: int = 64, num_beams: int = 5):
         no_repeat_ngram_size=2,
         num_return_sequences=1,
     )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True), prompt
+
 
 @app.post("/predict")
 async def predict_endpoint(req: QARequest):
     q = req.question.strip()
     if not q:
         raise HTTPException(status_code=400, detail="Empty question")
-    answer = predict(q)
-    return {"question": q, "answer": answer}
+    answer, prompt = predict(q)
+    return {"question": q, "answer": answer, "prompt": prompt}
+
 
 @app.post("/batch_predict")
 async def batch_predict(requests: list[QARequest]):

@@ -30,3 +30,4 @@ rouge-score
 sentencepiece
 elasticsearch
 deepspeed
+pydantic-settings

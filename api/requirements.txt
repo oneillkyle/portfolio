@@ -1,6 +1,5 @@
-tensorflow[and-cuda]
 elasticsearch
-fastapi[standard]
+fastapi
 elastic-apm
 starlette
 pydantic
@@ -8,5 +7,4 @@ tokenizers
 uvicorn
 watchdog
 transformers
-torch
-sentence-transformers
+pydantic-settings

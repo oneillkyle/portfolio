@@ -98,7 +98,8 @@ python pretrain_t5_wiki.py
 ### 2. **Fine-tuning on QA**
 
 ```bash
-python train_with_t5.py
+# python train_with_t5.py
+accelerate launch train_with_t5.py
 # loads from t5-small (or t5_wiki_pretrain/)
 # outputs → t5_trained_nq/
 ```

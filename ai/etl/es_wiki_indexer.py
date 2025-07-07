@@ -4,19 +4,56 @@ import json
 import glob
 from elasticsearch import Elasticsearch, helpers
 import argparse
+import urllib3
+from ..settings import settings
 
-def index_wiki_passages(wiki_dir, es_host="http://localhost:9200", index_name="qa_passages"):
+urllib3.disable_warnings()
+
+
+def index_wiki_passages(wiki_dir, index_name="qa_passages"):
     # 1️⃣ Connect to Elasticsearch
-    es = Elasticsearch(es_host)
+    es = Elasticsearch(
+        settings.elastic_host,
+        verify_certs=False,
+        basic_auth=(settings.elastic_username, settings.elastic_password))
 
     # 2️⃣ Create index with BM25 mapping if it doesn't exist
     if not es.indices.exists(index=index_name):
         es.indices.create(
             index=index_name,
             body={
+                "settings": {
+                    "index": {
+                        "max_ngram_diff": 2
+                    },
+                    "analysis": {
+                        "tokenizer": {
+                            "ngram_tokenizer": {
+                                "type": "ngram",
+                                "min_gram": 3,
+                                "max_gram": 5,
+                                "token_chars": ["letter", "digit"]
+                            }
+                        },
+                        "analyzer": {
+                            "ngram_analyzer": {
+                                "tokenizer": "ngram_tokenizer",
+                                "filter": ["lowercase"]
+                            }
+                        }
+                    }
+                },
                 "mappings": {
                     "properties": {
-                        "text": {"type": "text"}  # BM25-default field
+                        "text": {
+                            "type": "text",
+                            "fields": {
+                                "ngram": {
+                                    "type": "text",
+                                    "analyzer": "ngram_analyzer"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -72,6 +109,7 @@ def index_wiki_passages(wiki_dir, es_host="http://localhost:9200", index_name="q
     es.indices.refresh(index=index_name)
     print(f"✅ Indexed {doc_id} passages into '{index_name}'")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Index WikiExtractor JSONL output into Elasticsearch"
@@ -81,10 +119,6 @@ if __name__ == "__main__":
         help="Directory containing WikiExtractor JSONL files (any extension)"
     )
     parser.add_argument(
-        "--es_host", type=str, default="http://localhost:9200",
-        help="Elasticsearch host URL"
-    )
-    parser.add_argument(
         "--index", type=str, default="qa_passages",
         help="Name of the Elasticsearch index to create/use"
     )
@@ -92,6 +126,5 @@ if __name__ == "__main__":
 
     index_wiki_passages(
         wiki_dir=args.wiki_dir,
-        es_host=args.es_host,
         index_name=args.index
     )

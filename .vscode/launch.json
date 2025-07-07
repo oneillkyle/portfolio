@@ -15,6 +15,12 @@
             "type": "debugpy",
             "request": "launch",
             "module": "ai.t5.predict_t5"
+        },
+        {
+            "name": "Python Debugger: Wiki Indexer",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "ai.etl.es_wiki_indexer"
         }
     ]
 }

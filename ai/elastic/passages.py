@@ -1,12 +1,19 @@
 from elasticsearch import Elasticsearch, helpers
 
 # TODO move to environment variables.
-es_host="http://localhost:9200"
-INDEX="qa_passages"
+es_host = "http://localhost:9200"
+ELASTICSEARCH_USER = "elastic"
+ELASTICSEARCH_PASSWORD = "password"
+
+INDEX = "qa_passages"
+
 
 def retrieve(query, k=3):
-    es = Elasticsearch(es_host)
-    
+    es = Elasticsearch(
+        es_host,
+        verify_certs=False,
+        basic_auth=(ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD))
+
     resp = es.search(
         index=INDEX,
         body={
@@ -23,6 +30,7 @@ def retrieve(query, k=3):
     )
     return [hit["_source"]["text"] for hit in resp["hits"]["hits"]]
 
+
 # Quick test
-print(retrieve("What is the capital of France?", k=2))
+# print(retrieve("What is the capital of France?", k=2))
 # → ["The capital of France is Paris, …", "…"]

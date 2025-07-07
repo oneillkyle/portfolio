@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ARG PYTHON_VERSION=3.10.12
-FROM python:3.14-slim
+FROM python:3.13-alpine
 
 # FROM tensorflow/tensorflow:latest-gpu
 
@@ -26,8 +26,7 @@ RUN adduser \
 
 # Copy requirements.txt and install dependencies.
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt --no-cache-dir
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Switch to the non-privileged user to run the application.
 USER appuser
