@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     elastic_host: str
+    elastic_port: int
     elastic_username: str
     elastic_password: str
 

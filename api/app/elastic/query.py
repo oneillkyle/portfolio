@@ -1,5 +1,5 @@
 from elasticsearch import Elasticsearch, helpers
-from ..settings import settings
+from settings import settings
 import urllib3
 
 urllib3.disable_warnings()
@@ -9,7 +9,11 @@ INDEX = "qa_passages"
 
 def retrieve(query, k=5):
     es = Elasticsearch(
-        settings.elastic_host,
+        hosts=[
+            {'host': settings.elastic_host,
+             'port': settings.elastic_port,
+             'scheme': 'https'}
+        ],
         verify_certs=False,
         basic_auth=(settings.elastic_username, settings.elastic_password))
 

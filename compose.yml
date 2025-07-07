@@ -302,11 +302,12 @@ services:
     # (default stop signal from Compose is SIGTERM)
     stop_signal: SIGINT
     ports:
-      - "8000:8000"
+      - "8000:80"
     # environment:
     #   - API_SERVER_ADDR=9091
     volumes:
-      - ./api:/src
+      - ./api/app:/app
+      # - ./api/app/saved_models:/saved_models
     restart: always
     # networks:
     #   - portfolio

@@ -8,3 +8,4 @@ uvicorn
 watchdog
 transformers
 pydantic-settings
+sentencepiece
