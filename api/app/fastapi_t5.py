@@ -11,8 +11,6 @@ app = FastAPI()
 class QARequest(BaseModel):
     question: str
 
-print('here');
-
 # Load model on startup
 # MODEL_DIR = "saved_models/t5_trained_nq"
 MODEL_DIR = "saved_models/t5_wiki_pretrain_fast"
@@ -20,8 +18,6 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 tokenizer = T5Tokenizer.from_pretrained(MODEL_DIR)
 model = T5ForConditionalGeneration.from_pretrained(MODEL_DIR).to(DEVICE)
 model.eval()
-
-print('there');
 
 def predict(question: str, max_length: int = 64, num_beams: int = 5, k=3):
     ctxs = retrieve(question, k)
