@@ -28,6 +28,6 @@ seaborn
 datasets
 rouge-score
 sentencepiece
-elasticsearch
+elasticsearch==8.18.1
 deepspeed
 pydantic-settings

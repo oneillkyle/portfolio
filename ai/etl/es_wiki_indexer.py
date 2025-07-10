@@ -13,8 +13,12 @@ urllib3.disable_warnings()
 def index_wiki_passages(wiki_dir, index_name="qa_passages"):
     # 1️⃣ Connect to Elasticsearch
     es = Elasticsearch(
-        settings.elastic_host,
-        verify_certs=False,
+         hosts=[
+            {'host': settings.elastic_host,
+             'port': settings.elastic_port,
+             'scheme': 'https'}
+        ],
+        verify_certs=settings.elastic_veryify_cert,
         basic_auth=(settings.elastic_username, settings.elastic_password))
 
     # 2️⃣ Create index with BM25 mapping if it doesn't exist

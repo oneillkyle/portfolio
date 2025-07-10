@@ -14,7 +14,7 @@ def retrieve(query, k=5):
              'port': settings.elastic_port,
              'scheme': 'https'}
         ],
-        verify_certs=False,
+        verify_certs=settings.elastic_veryify_cert,
         basic_auth=(settings.elastic_username, settings.elastic_password))
 
     resp = es.search(

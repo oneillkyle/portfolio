@@ -6,8 +6,9 @@ class Settings(BaseSettings):
     elastic_port: int
     elastic_username: str
     elastic_password: str
+    elastic_veryify_cert: bool = False
 
-    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+    # model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
 
 settings = Settings()

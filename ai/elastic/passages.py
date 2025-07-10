@@ -1,18 +1,18 @@
 from elasticsearch import Elasticsearch, helpers
-
-# TODO move to environment variables.
-es_host = "http://localhost:9200"
-ELASTICSEARCH_USER = "elastic"
-ELASTICSEARCH_PASSWORD = "password"
+from ..settings import settings
 
 INDEX = "qa_passages"
 
 
 def retrieve(query, k=3):
     es = Elasticsearch(
-        es_host,
-        verify_certs=False,
-        basic_auth=(ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD))
+        hosts=[
+            {'host': settings.elastic_host,
+             'port': settings.elastic_port,
+             'scheme': 'https'}
+        ],
+        verify_certs=settings.elastic_veryify_cert,
+        basic_auth=(settings.elastic_username, settings.elastic_password))
 
     resp = es.search(
         index=INDEX,
