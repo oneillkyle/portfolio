@@ -309,6 +309,7 @@ services:
       - ELASTIC_USERNAME=${ELASTIC_USERNAME}
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - ELASTIC_VERYIFY_CERT=${ELASTIC_VERIFY_CERT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - ./api/app:/app
       # - ./api/app/saved_models:/saved_models
