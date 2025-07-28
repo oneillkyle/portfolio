@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
@@ -8,9 +9,12 @@ from elastic.query import retrieve
 from openai_proxy import router as openai_router
 
 
-
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(openai_router)
+
+app.add_middleware(
+    TrustedHostMiddleware, allowed_hosts=["kyleoneill.co", "*.kyleoneill.co"]
+)
 
 origins = [
     # "http://localhost:5173",
@@ -25,8 +29,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class QARequest(BaseModel):
     question: str
+
 
 # Load model on startup
 # MODEL_DIR = "saved_models/t5_trained_nq"
@@ -36,11 +42,12 @@ tokenizer = T5Tokenizer.from_pretrained(MODEL_DIR)
 model = T5ForConditionalGeneration.from_pretrained(MODEL_DIR).to(DEVICE)
 model.eval()
 
+
 def predict(question: str, max_length: int = 64, num_beams: int = 5, k=3):
     ctxs = retrieve(question, k)
     context = " ".join(ctxs)
     prompt = f"context: {context}  question: {question}"
-    
+
     inputs = tokenizer(
         prompt,
         return_tensors="pt",
