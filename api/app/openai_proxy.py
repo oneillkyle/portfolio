@@ -1,16 +1,20 @@
 # app/openai_proxy.py
 
 import os
-from fastapi import APIRouter, FastAPI, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from openai import OpenAI
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+limiter = Limiter(key_func=get_remote_address)
 
 # Read your key from env (make sure it’s set in your Docker/hosting env)
 
 router = APIRouter(prefix="/openai")
 
 @router.post("/chat/completions")
+@limiter.limit("5/minute")
 async def proxy_chat_completions(request: Request):
     """
     Proxy for OpenAI Chat Completion endpoint.
@@ -24,6 +28,7 @@ async def proxy_chat_completions(request: Request):
     return resp
 
 @router.post("/completions")
+@limiter.limit("5/minute")
 async def proxy_completions(request: Request):
     """
     Proxy for the classic Completion endpoint.
@@ -36,6 +41,7 @@ async def proxy_completions(request: Request):
     return resp
 
 @router.post("/embeddings")
+@limiter.limit("5/minute")
 async def proxy_embeddings(request: Request):
     """
     Proxy for Embeddings.
@@ -49,6 +55,7 @@ async def proxy_embeddings(request: Request):
     return resp
 
 @router.post("/images/generations")
+@limiter.limit("5/minute")
 async def proxy_image_generations(request: Request):
     """
     Proxy for DALL·E image generation.

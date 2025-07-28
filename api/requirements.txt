@@ -10,3 +10,4 @@ transformers
 pydantic-settings
 sentencepiece
 openai
+slowapi
