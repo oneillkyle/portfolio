@@ -9,3 +9,4 @@ watchdog
 transformers
 pydantic-settings
 sentencepiece
+openai

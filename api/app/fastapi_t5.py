@@ -1,12 +1,29 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
 from elastic.query import retrieve
+from openai_proxy import router as openai_router
+
+
 
 app = FastAPI()
+app.include_router(openai_router)
 
+origins = [
+    "http://localhost:5173",
+    "https://www.kyleoneill.co"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QARequest(BaseModel):
     question: str
@@ -39,7 +56,7 @@ def predict(question: str, max_length: int = 64, num_beams: int = 5, k=3):
         no_repeat_ngram_size=2,
         num_return_sequences=1,
     )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True), prompt
+    return tokenizer.decode(outputs[0], skip_special_tokens=True), context
 
 
 @app.post("/predict")
@@ -47,8 +64,8 @@ async def predict_endpoint(req: QARequest):
     q = req.question.strip()
     if not q:
         raise HTTPException(status_code=400, detail="Empty question")
-    answer, prompt = predict(q)
-    return {"question": q, "answer": answer, "prompt": prompt}
+    answer, context = predict(q)
+    return {"question": q, "answer": answer, "context": context}
 
 
 @app.post("/batch_predict")
