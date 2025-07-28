@@ -13,7 +13,7 @@ app = FastAPI()
 app.include_router(openai_router)
 
 origins = [
-    "http://localhost:5173",
+    # "http://localhost:5173",
     "https://www.kyleoneill.co"
 ]
 

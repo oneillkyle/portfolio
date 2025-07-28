@@ -2,10 +2,11 @@
 
 import os
 from fastapi import APIRouter, FastAPI, Request, HTTPException
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Read your key from env (make sure it’s set in your Docker/hosting env)
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 router = APIRouter(prefix="/openai")
 
@@ -17,7 +18,7 @@ async def proxy_chat_completions(request: Request):
     """
     body = await request.json()
     try:
-        resp = openai.ChatCompletion.create(**body)
+        resp = client.chat.completions.create(**body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return resp
@@ -29,7 +30,7 @@ async def proxy_completions(request: Request):
     """
     body = await request.json()
     try:
-        resp = openai.Completion.create(**body)
+        resp = client.completions.create(**body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return resp
@@ -42,7 +43,7 @@ async def proxy_embeddings(request: Request):
     """
     body = await request.json()
     try:
-        resp = openai.Embedding.create(**body)
+        resp = client.embeddings.create(**body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return resp
@@ -55,7 +56,7 @@ async def proxy_image_generations(request: Request):
     """
     body = await request.json()
     try:
-        resp = openai.Image.create(**body)
+        resp = client.images.generate(**body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return resp
