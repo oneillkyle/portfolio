@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -22,18 +22,18 @@ app.include_router(openai_router)
 #     TrustedHostMiddleware, allowed_hosts=["kyleoneill.co", "*.kyleoneill.co"]
 # )
 
-origins = [
-    "http://localhost:5173",
-    "https://www.kyleoneill.co"
-]
+# origins = [
+#     "http://localhost:5173",
+#     "https://www.kyleoneill.co"
+# ]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 
 class QARequest(BaseModel):
