@@ -33,16 +33,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Switch to the non-privileged user to run the application.
-USER appuser
-
 # Copy the source code into the container.
 COPY app ./
+RUN rm -rf /app/saved_models/t5_wiki_pretrain_fast/checkpoint-*
 # COPY .env ./
+
+# Switch to the non-privileged user to run the application.
+USER appuser
 
 # Expose the port that the application listens on.
 EXPOSE 80
 
 # Run the application.
-CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
+CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80"]
 # CMD ["fastapi", "dev", "app/main.py"]
