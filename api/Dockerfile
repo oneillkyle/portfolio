@@ -32,6 +32,7 @@ RUN adduser \
 COPY requirements.txt .
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gunicorn
 
 # Copy the source code into the container.
 COPY app ./
@@ -45,5 +46,5 @@ USER appuser
 EXPOSE 80
 
 # Run the application.
-CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80"]
-# CMD ["fastapi", "dev", "app/main.py"]
+# CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "fastapi_t5:app", "-b", "0.0.0.0:80", "--workers", "4", "--timeout", "120"]
