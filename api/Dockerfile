@@ -46,5 +46,5 @@ USER appuser
 EXPOSE 80
 
 # Run the application.
-# CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80"]
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "fastapi_t5:app", "-b", "0.0.0.0:80", "--workers", "4", "--timeout", "120"]
+CMD ["uvicorn", "fastapi_t5:app", "--host", "0.0.0.0", "--port", "80"]
+# CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "fastapi_t5:app", "-b", "0.0.0.0:80", "--workers", "4", "--timeout", "120"]
