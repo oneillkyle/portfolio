@@ -4,7 +4,7 @@ End-to-end pipeline to pre-train a T5-style seq2seq model on a raw text corpus u
 
 ## layout
 
-my_pipeline/
+t5_wiki/
 - data/
 	- raw/               # raw source files (symlinked/copied during ingest)
 	- processed/         # TFRecord shards written by transform
@@ -31,12 +31,12 @@ my_pipeline/
 ```
 python -m venv .venv
 . .venv/bin/activate
-pip install -r my_pipeline/requirements.txt
+pip install -r t5_wiki/requirements.txt
 ```
 
 ## configuration
 
-`my_pipeline/configs/default.yaml` keys:
+`t5_wiki/configs/default.yaml` keys:
 
 - data
 	- `raw_data_path`: path to your raw text (one document per line)
@@ -55,23 +55,23 @@ pip install -r my_pipeline/requirements.txt
 Run all steps:
 
 ```
-bash my_pipeline/scripts/run_pipeline.sh --config my_pipeline/configs/default.yaml
+bash t5_wiki/scripts/run_pipeline.sh --config t5_wiki/configs/default.yaml
 ```
 
 Or step-by-step:
 
 ```
-python -m my_pipeline.src.ingest --config my_pipeline/configs/default.yaml
-python -m my_pipeline.src.transform --config my_pipeline/configs/default.yaml
-python -m my_pipeline.src.train --config my_pipeline/configs/default.yaml
-python -m my_pipeline.src.evaluate --config my_pipeline/configs/default.yaml
-python -m my_pipeline.src.export --config my_pipeline/configs/default.yaml
+python -m t5_wiki.src.ingest --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.transform --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.train --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.evaluate --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.export --config t5_wiki/configs/default.yaml
 ```
 
 View TensorBoard:
 
 ```
-tensorboard --logdir my_pipeline/logs
+tensorboard --logdir t5_wiki/logs
 ```
 
 ## notes

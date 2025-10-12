@@ -8,9 +8,9 @@ import numpy as np
 import tensorflow as tf
 from transformers import T5TokenizerFast
 
-from my_pipeline.src.utils import load_config, ensure_dir
-from my_pipeline.src.model import build_model
-from my_pipeline.src.train import dataset_from_tfrecord
+from t5_wiki.src.utils import load_config, ensure_dir
+from t5_wiki.src.model import build_model
+from t5_wiki.src.train import dataset_from_tfrecord
 
 
 def write_simple_tfrecord(lines: Iterable[str], tokenizer: T5TokenizerFast, block_size: int, out_path: str) -> None:
@@ -38,7 +38,7 @@ def write_simple_tfrecord(lines: Iterable[str], tokenizer: T5TokenizerFast, bloc
 
 
 def main():
-    cfg = load_config("my_pipeline/configs/default.yaml")
+    cfg = load_config("t5_wiki/configs/default.yaml")
     raw_path = cfg["raw_data_path"]
     assert os.path.exists(raw_path), f"Missing raw file: {raw_path}"
 
@@ -48,7 +48,7 @@ def main():
 
     tokenizer = T5TokenizerFast.from_pretrained(cfg["model_name"])
 
-    tmp_dir = os.path.join("my_pipeline", "data", "processed", "smoke")
+    tmp_dir = os.path.join("t5_wiki", "data", "processed", "smoke")
     ensure_dir(tmp_dir)
     tfrec = os.path.join(tmp_dir, "smoke.tfrecord")
     write_simple_tfrecord(lines, tokenizer, int(cfg["block_size"]), tfrec)
