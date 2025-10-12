@@ -5,3 +5,16 @@ logstash_ingest_data
 ai/datasets/*
 ai/saved_models/*
 ai/training_checkpoints/*
+
+# Python venv
+.venv/
+
+# VS Code
+.vscode/
+
+# macOS/Linux editor cruft
+.DS_Store
+*.swp
+*.swo
+
+# Keep root-level ignores for infra/dev only; pipeline has its own .gitignore
