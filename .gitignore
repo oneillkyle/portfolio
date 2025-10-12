@@ -17,4 +17,5 @@ ai/training_checkpoints/*
 *.swp
 *.swo
 
-# Keep root-level ignores for infra/dev only; pipeline has its own .gitignore
+__pycache__/
+*.pyc
