@@ -1,3 +1,4 @@
-transformers>=4.40
-tensorflow>=2.14
+transformers<5
+tensorflow<2.16
 pyyaml>=6.0
+tf-keras
