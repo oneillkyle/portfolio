@@ -10,10 +10,13 @@ echo "[2/5] Transform"
 python -m t5_wiki.src.transform --config "$CONFIG"
 
 echo "[3/5] Train"
-python -m t5_wiki.src.train --config "$CONFIG"
+	echo "[3/5] Train (PyTorch)"
+	python -m t5_wiki.src.train_pt --config "$CONFIG"
 
 echo "[4/5] Evaluate"
-python -m t5_wiki.src.evaluate --config "$CONFIG" || true
+	echo "[4/5] Evaluate (PyTorch)"
+	python -m t5_wiki.src.evaluate_pt --config "$CONFIG" || true
 
 echo "[5/5] Export"
-python -m t5_wiki.src.export --config "$CONFIG"
+	echo "[5/5] Export (PyTorch)"
+	python -m t5_wiki.src.export_pt --config "$CONFIG"

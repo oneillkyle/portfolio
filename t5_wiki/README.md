@@ -1,4 +1,42 @@
-# TensorFlow T5 Pipeline
+# PyTorch T5 Pipeline (Recommended)
+
+The pipeline is now fully supported in PyTorch using Hugging Face Transformers and Datasets. All major steps have a `_pt.py` version:
+
+- `src/train_pt.py` — PyTorch training (span corruption, Trainer API)
+- `src/evaluate_pt.py` — Evaluate on validation split
+- `src/test_pt.py` — Evaluate on test set
+- `src/export_pt.py` — Export model and tokenizer
+- `scripts/tune_pt.py` — Hyperparameter tuning (grid search)
+
+## Run the PyTorch pipeline
+
+Train:
+```bash
+python -m t5_wiki.src.train_pt --config t5_wiki/configs/default.yaml
+```
+Evaluate:
+```bash
+python -m t5_wiki.src.evaluate_pt --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.advanced_eval_pt --config t5_wiki/configs/default.yaml
+```
+Test:
+```bash
+python -m t5_wiki.src.test_pt --config t5_wiki/configs/default.yaml
+```
+Export:
+```bash
+python -m t5_wiki.src.export_pt --config t5_wiki/configs/default.yaml
+```
+Tune:
+```bash
+python t5_wiki/scripts/tune_pt.py
+```
+
+All logging and metrics are available in TensorBoard as before.
+
+---
+
+# (Legacy) TensorFlow pipeline
 
 End-to-end pipeline to pre-train a T5-style seq2seq model on a raw text corpus using TensorFlow + Hugging Face Transformers.
 
