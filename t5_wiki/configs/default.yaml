@@ -18,6 +18,7 @@ batch_size: 8
 epochs: 1
 learning_rate: 3e-4
 mixed_precision: true
+val_size: 2000
 
 # Strategy
 strategy: auto  # auto | mirrored | multiworker

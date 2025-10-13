@@ -19,8 +19,8 @@ def main():
     args = parser.parse_args()
 
     run(f"python3 -m t5_wiki.src.ingest --config {args.config}")
-    if not args.skip_test_split:
-        run(f"python3 -m t5_wiki.scripts.make_test_split --config {args.config}")
+    # if not args.skip_test_split:
+    #     run(f"python3 -m t5_wiki.scripts.make_test_split --config {args.config}")
     run(f"python3 -m t5_wiki.src.train_pt --config {args.config}")
     run(f"python3 -m t5_wiki.src.evaluate_pt --config {args.config}")
     if args.test:

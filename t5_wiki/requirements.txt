@@ -5,3 +5,4 @@ pandas
 matplotlib
 seaborn
 rouge_score
+accelerate>=0.26.0

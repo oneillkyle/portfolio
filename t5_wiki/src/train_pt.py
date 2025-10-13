@@ -4,6 +4,17 @@ import numpy as np
 import os
 import yaml
 from .utils import load_config, parse_args, ensure_dir
+import torch
+
+print("CUDA available:", torch.cuda.is_available())
+print("Device count:", torch.cuda.device_count())
+if torch.cuda.is_available():
+    print("Device name:", torch.cuda.get_device_name(0))
+
+import transformers
+print(transformers.__file__)
+from transformers import TrainingArguments
+print(TrainingArguments.__init__.__doc__)
 
 import numpy as np
 def _random_spans_noise_mask(length: int, noise_density: float, mean_span_length: float) -> np.ndarray:
@@ -56,32 +67,65 @@ def main():
     model_name = cfg["model_name"]
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    # Load raw data (assume one line per example)
+    print("[LOG] Starting data load...")
     raw_path = os.path.join(cfg["raw_dir"], os.path.basename(cfg["raw_data_path"]))
-    with open(raw_path, "r", encoding="utf-8") as f:
-        lines = [line.strip() for line in f if line.strip()]
-    dataset = Dataset.from_dict({"text": lines})
 
-    # Apply span corruption
-    dataset = dataset.map(lambda ex: span_corrupt_example(ex, tokenizer,
-        noise_density=float(cfg.get("noise_density", 0.15)),
-        mean_span_length=int(cfg.get("mean_span_length", 3)),
-        block_size=int(cfg["block_size"])),
-        remove_columns=["text"])
+    # Use streaming mode for large datasets
+    print("[LOG] Loading dataset in streaming mode...")
+    dataset = load_dataset(
+        "text",
+        data_files={"train": raw_path},
+        split="train",
+        streaming=True
+    )
+    print("[LOG] Streaming dataset loaded.")
 
-    # Split train/val
-    split = dataset.train_test_split(test_size=0.05, seed=cfg.get("random_seed", 42))
-    train_ds, val_ds = split["train"], split["test"]
+    # Map preprocessing (tokenization, span corruption)
+    def preprocess(example):
+        ids = tokenizer.encode(example["text"], truncation=True, max_length=int(cfg["block_size"]))
+        mask = _random_spans_noise_mask(len(ids), float(cfg.get("noise_density", 0.15)), int(cfg.get("mean_span_length", 3)))
+        input_ids = []
+        target_ids = []
+        sentinel_count = 0
+        i = 0
+        while i < len(ids):
+            if mask[i]:
+                input_ids.append(_sentinel_id(tokenizer, sentinel_count))
+                target_ids.append(_sentinel_id(tokenizer, sentinel_count))
+                sentinel_count += 1
+                while i < len(ids) and mask[i]:
+                    target_ids.append(ids[i])
+                    i += 1
+            else:
+                input_ids.append(ids[i])
+                i += 1
+        target_ids.append(tokenizer.eos_token_id)
+        pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+        input_ids = np.pad(input_ids, (0, max(0, int(cfg["block_size"]) - len(input_ids))), constant_values=pad_id)[:int(cfg["block_size"])]
+        target_ids = np.pad(target_ids, (0, max(0, int(cfg["block_size"]) - len(target_ids))), constant_values=-100)[:int(cfg["block_size"])]
+        return {"input_ids": input_ids.tolist(), "labels": target_ids.tolist()}
+
+    print("[LOG] Applying preprocessing...")
+    dataset = dataset.map(preprocess)
+    print("[LOG] Preprocessing complete.")
+
+    # Split train/val using islice for streaming datasets
+    from itertools import islice
+    val_size = int(cfg.get("val_size", 1000))
+    val_ds = dataset.take(val_size)
+    train_ds = dataset.skip(val_size)
 
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
+    # For streaming datasets, set max_steps instead of num_train_epochs
+    # 10,000 is a good default for large-scale pretraining; adjust as needed
     training_args = TrainingArguments(
         output_dir=cfg["log_dir"],
         per_device_train_batch_size=int(cfg["batch_size"]),
         per_device_eval_batch_size=int(cfg["batch_size"]),
-        num_train_epochs=int(cfg["epochs"]),
+        max_steps=10000,  # Set your desired number of steps
         learning_rate=float(cfg["learning_rate"]),
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         logging_dir=os.path.join(cfg["log_dir"], "tensorboard"),
         report_to=["tensorboard"],
