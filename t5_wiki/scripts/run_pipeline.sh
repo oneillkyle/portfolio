@@ -15,7 +15,7 @@ echo "[3/5] Train"
 
 echo "[4/5] Evaluate"
 	echo "[4/5] Evaluate (PyTorch)"
-	python -m t5_wiki.src.evaluate_pt --config "$CONFIG" || true
+	python -m t5_wiki.src.advanced_eval_pt --config "$CONFIG" || true
 
 echo "[5/5] Export"
 	echo "[5/5] Export (PyTorch)"

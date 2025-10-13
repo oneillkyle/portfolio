@@ -29,6 +29,18 @@ def main():
     model_dir = cfg.get("log_dir", "./logs")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
     model.eval()
+    
+    # Set up logging to file
+    log_file = os.path.join(model_dir, "advanced_eval_results.txt")
+    os.makedirs(model_dir, exist_ok=True)
+    
+    def log_and_print(message):
+        print(message)
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
+    
+    log_and_print(f"Advanced Evaluation Results - Model: {model_name}")
+    log_and_print("=" * 50)
 
     # Load test data
     test_path = os.path.join(cfg["processed_dir"], "test.txt")
@@ -50,16 +62,21 @@ def main():
         pred = tokenizer.decode(output[0], skip_special_tokens=True)
         preds.append(pred)
         refs.append(row["text"])
-        # Print a few samples
+        # Print and log a few samples
         if len(preds) <= 5:
-            print(f"\nInput: {row['text']}\nOutput: {pred}\n")
+            sample_msg = f"\nSample {len(preds)}:\nInput: {row['text']}\nOutput: {pred}\n"
+            log_and_print(sample_msg)
 
     # Compute ROUGE if available
     if has_rouge:
         rouge = compute_rouge(preds, refs)
-        print("ROUGE:", rouge)
+        rouge_msg = f"ROUGE Scores: {rouge}"
+        log_and_print(rouge_msg)
     else:
-        print("Install rouge_score for ROUGE metrics: pip install rouge_score")
+        log_and_print("Install rouge_score for ROUGE metrics: pip install rouge_score")
+    
+    log_and_print(f"\nEvaluation completed. Total samples: {len(preds)}")
+    log_and_print(f"Results saved to: {log_file}")
 
 if __name__ == "__main__":
     main()

@@ -27,3 +27,7 @@ strategy: auto  # auto | mirrored | multiworker
 log_dir: t5_wiki/logs
 ckpt_dir: t5_wiki/logs/checkpoints
 save_interval: 1000
+
+# Visualization & Tracking
+use_wandb: true
+run_name: t5-wiki-pytorch

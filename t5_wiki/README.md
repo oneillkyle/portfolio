@@ -2,37 +2,111 @@
 
 The pipeline is now fully supported in PyTorch using Hugging Face Transformers and Datasets. All major steps have a `_pt.py` version:
 
-- `src/train_pt.py` — PyTorch training (span corruption, Trainer API)
-- `src/evaluate_pt.py` — Evaluate on validation split
+- `src/train_pt.py` — PyTorch training (span corruption, Trainer API, streaming datasets)
+- `src/evaluate_pt.py` — Basic evaluation (perplexity)
+- `src/advanced_eval_pt.py` — Advanced evaluation (ROUGE scores, sample outputs)
 - `src/test_pt.py` — Evaluate on test set
 - `src/export_pt.py` — Export model and tokenizer
 - `scripts/tune_pt.py` — Hyperparameter tuning (grid search)
+- `scripts/visualize_results.py` — Generate comprehensive visualizations
 
-## Run the PyTorch pipeline
+## Quick Start
 
-Train:
+Run the complete pipeline:
+```bash
+# Full pipeline (ingest → transform → train → evaluate → export)
+bash t5_wiki/scripts/run_pipeline.sh t5_wiki/configs/default.yaml
+
+# Or run individual components (orchestrated)
+python -m t5_wiki.scripts.run_all --config t5_wiki/configs/default.yaml
+```
+
+## Individual Components
+
+Train (with streaming for large datasets):
 ```bash
 python -m t5_wiki.src.train_pt --config t5_wiki/configs/default.yaml
 ```
+
 Evaluate:
 ```bash
+# Basic evaluation (perplexity)
 python -m t5_wiki.src.evaluate_pt --config t5_wiki/configs/default.yaml
+
+# Advanced evaluation (ROUGE + sample outputs + file logging)
 python -m t5_wiki.src.advanced_eval_pt --config t5_wiki/configs/default.yaml
 ```
+
 Test:
 ```bash
 python -m t5_wiki.src.test_pt --config t5_wiki/configs/default.yaml
 ```
+
 Export:
 ```bash
 python -m t5_wiki.src.export_pt --config t5_wiki/configs/default.yaml
 ```
-Tune:
+
+Hyperparameter tuning:
 ```bash
 python t5_wiki/scripts/tune_pt.py
 ```
 
-All logging and metrics are available in TensorBoard as before.
+## Visualization & Monitoring
+
+### Real-time Training Monitoring (TensorBoard)
+```bash
+# Start TensorBoard (runs in background)
+tensorboard --logdir t5_wiki/logs/tensorboard --host 0.0.0.0 --port 6006
+
+# View at: http://localhost:6006
+# Shows: training loss, learning rate, GPU utilization, system metrics
+```
+
+### Advanced Experiment Tracking (Weights & Biases)
+```bash
+# One-time setup
+pip install wandb
+wandb login
+
+# Enable in config
+echo "use_wandb: true" >> t5_wiki/configs/default.yaml
+
+# Training will auto-sync to wandb.ai with:
+# - Hyperparameters, metrics, system stats
+# - Model architecture, gradients
+# - Sample outputs and comparisons
+```
+
+### Comprehensive Visualization Dashboard
+```bash
+# Generate plots and HTML dashboard
+python t5_wiki/scripts/visualize_results.py
+
+# Creates:
+# - t5_wiki/logs/training_metrics.png (loss curves, metrics)
+# - t5_wiki/logs/rouge_scores.png (evaluation metrics over time)
+# - t5_wiki/logs/training_report.html (comprehensive dashboard)
+# - t5_wiki/logs/tuning_results.png (hyperparameter comparison)
+```
+
+### Quick Results Check
+```bash
+# View latest evaluation results (includes sample outputs)
+cat t5_wiki/logs/advanced_eval_results.txt
+
+# View training progress
+tail -f t5_wiki/logs/tensorboard/events.out.tfevents.*
+```
+
+## Key Features
+
+- **Streaming Dataset Loading**: Handles large datasets without memory issues
+- **Advanced Evaluation**: ROUGE scores + sample text generation inspection
+- **Comprehensive Logging**: Results saved to files + console output
+- **Multiple Visualization Options**: TensorBoard, W&B, custom plots
+- **Memory Efficient**: Uses Hugging Face Datasets streaming mode
+- **GPU Optimized**: Automatic device detection and mixed precision support
 
 ---
 
@@ -67,7 +141,7 @@ t5_wiki/
 - Install dependencies:
 
 ```
-python -m venv .venv
+python3 -m venv .venv
 . .venv/bin/activate
 pip install -r t5_wiki/requirements.txt
 ```
@@ -117,30 +191,62 @@ View TensorBoard:
 tensorboard --logdir t5_wiki/logs
 ```
 
-## TensorBoard integration
+## Configuration
 
-All training, evaluation, test, and tuning metrics are logged to TensorBoard for easy visualization and comparison.
+Key settings in `t5_wiki/configs/default.yaml`:
 
-- **Training:**
-  - Logs are written to `t5_wiki/logs/{experiment}/{timestamp}/tensorboard/`
-- **Evaluation:**
-  - Logs are written to `t5_wiki/logs/{experiment}/eval_tensorboard/`
-- **Test:**
-  - Logs are written to `t5_wiki/logs/{experiment}/test_tensorboard/`
-- **Tuning:**
-  - Logs are written to `t5_wiki/logs/tuning/tuning_tensorboard/`
-
-To launch TensorBoard and view all experiment metrics:
-
-```bash
-. .venv/bin/activate
-# From the project root:
-tensorboard --logdir t5_wiki/logs
+### Data & Model
+```yaml
+raw_data_path: ai/datasets/wiki_corpus.subsample.txt  # Input text file
+model_name: t5-small                                  # HF model to fine-tune
+block_size: 256                                       # Sequence length
+val_size: 2000                                        # Validation split size
 ```
 
-Open the displayed URL in your browser to explore training curves, validation/test metrics, and compare tuning runs.
+### Training
+```yaml
+batch_size: 8           # Per-device batch size
+learning_rate: 3e-4     # Learning rate
+mixed_precision: true   # Enable FP16 for faster training
+max_steps: 10000        # Training steps (for streaming datasets)
+```
 
-You can filter, group, and compare runs by experiment, timestamp, or hyperparameters.
+### Visualization & Tracking
+```yaml
+use_wandb: true                    # Enable W&B tracking
+run_name: t5-wiki-pytorch         # Experiment name
+log_dir: t5_wiki/logs             # Local log directory
+```
+
+## Memory Management
+
+For large datasets, the pipeline uses **streaming mode** to avoid loading all data into RAM:
+
+- Datasets are loaded incrementally during training
+- Only `val_size` examples are kept in memory for validation
+- Supports datasets of any size without OOM errors
+
+## Output Files & Logs
+
+### Training Outputs
+- **Model**: `t5_wiki/logs/` (trained model + tokenizer)
+- **TensorBoard**: `t5_wiki/logs/tensorboard/` (training metrics)
+- **Checkpoints**: Automatic saving every epoch
+
+### Evaluation Outputs
+- **Advanced Results**: `t5_wiki/logs/advanced_eval_results.txt`
+  - Sample input/output pairs
+  - ROUGE scores
+  - Evaluation metrics
+- **Visualizations**: 
+  - `training_metrics.png` (loss curves)
+  - `rouge_scores.png` (evaluation over time)
+  - `training_report.html` (comprehensive dashboard)
+
+### Hyperparameter Tuning
+- **Results**: `t5_wiki/logs/tuning_pt/tuning_results.csv`
+- **Configs**: `t5_wiki/logs/tuning_pt/*.yaml` (per experiment)
+- **Plots**: `tuning_results.png` (performance comparison)
 
 ## notes
 

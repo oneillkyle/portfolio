@@ -30,7 +30,7 @@ def run_train(config):
     ], check=True)
     # Evaluate
     eval_out = subprocess.run([
-        "python3", "-m", "t5_wiki.src.evaluate_pt", "--config", tmp_cfg
+        "python3", "-m", "t5_wiki.src.advanced_eval_pt", "--config", tmp_cfg
     ], capture_output=True, text=True)
     # Log results
     with open(os.path.join(LOG_DIR, "tuning_results.csv"), "a") as rf:
