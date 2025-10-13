@@ -17,6 +17,7 @@ python -m t5_wiki.src.train_pt --config t5_wiki/configs/default.yaml
 Evaluate:
 ```bash
 python -m t5_wiki.src.evaluate_pt --config t5_wiki/configs/default.yaml
+python -m t5_wiki.src.advanced_eval_pt --config t5_wiki/configs/default.yaml
 ```
 Test:
 ```bash
