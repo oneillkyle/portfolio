@@ -3,20 +3,20 @@ set -euo pipefail
 
 CONFIG=${1:-configs/default.yaml}
 
-echo "[1/5] Ingest"
+echo "[1/4] Ingest"
 python -m t5_wiki.src.ingest --config "$CONFIG"
 
-echo "[2/5] Transform"
-python -m t5_wiki.src.transform --config "$CONFIG"
+echo "[2/4] Create Test Split"
+python -m t5_wiki.scripts.make_test_split_pt --config "$CONFIG" --num_lines 1000
 
-echo "[3/5] Train"
-	echo "[3/5] Train (PyTorch)"
-	python -m t5_wiki.src.train_pt --config "$CONFIG"
+echo "[3/4] Train"
+python -m t5_wiki.src.train_pt --config "$CONFIG"
 
-echo "[4/5] Evaluate"
-	echo "[4/5] Evaluate (PyTorch)"
-	python -m t5_wiki.src.advanced_eval_pt --config "$CONFIG" || true
+echo "[4/4] Evaluate & Test"
+echo "  Evaluating..."
+python -m t5_wiki.src.advanced_eval_pt --config "$CONFIG" || true
+echo "  Testing..."
+python -m t5_wiki.src.test_pt --config "$CONFIG" || true
 
-echo "[5/5] Export"
-	echo "[5/5] Export (PyTorch)"
-	python -m t5_wiki.src.export_pt --config "$CONFIG"
+echo "[Export] Saving model..."
+python -m t5_wiki.src.export_pt --config "$CONFIG"

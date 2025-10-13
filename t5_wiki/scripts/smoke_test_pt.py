@@ -33,7 +33,7 @@ def main():
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
         num_train_epochs=1,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         logging_dir="t5_wiki/logs/smoke_pt/tensorboard",
         report_to=["tensorboard"],
     )
