@@ -22,9 +22,15 @@ def main():
     dataset = Dataset.from_dict({"text": lines})
 
     # Tokenize and corrupt spans
+    import numpy as np
     def preprocess(example):
-        ids = tokenizer.encode(example["text"], truncation=True, max_length=int(cfg["block_size"]))
-        return {"input_ids": ids, "labels": ids}
+        block_size = int(cfg["block_size"])
+        ids = tokenizer.encode(example["text"], truncation=True, max_length=block_size)
+        pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+        # Pad or truncate to block_size
+        input_ids = np.pad(ids, (0, max(0, block_size - len(ids))), constant_values=pad_id)[:block_size]
+        labels = np.pad(ids, (0, max(0, block_size - len(ids))), constant_values=-100)[:block_size]
+        return {"input_ids": input_ids.tolist(), "labels": labels.tolist()}
     dataset = dataset.map(preprocess, remove_columns=["text"])
 
     model_dir = cfg.get("log_dir", "./logs")
