@@ -38,6 +38,16 @@ def dataset_from_tfrecord(path: str, block_size: int, batch_size: int) -> tf.dat
     return ds
 
 
+
+def get_strategy(cfg):
+    strat = str(cfg.get("strategy", "auto")).lower()
+    if strat == "mirrored":
+        return tf.distribute.MirroredStrategy()
+    elif strat == "multiworker":
+        return tf.distribute.MultiWorkerMirroredStrategy()
+    else:
+        return tf.distribute.get_strategy()
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
@@ -45,15 +55,18 @@ def main() -> None:
     if cfg.get("mixed_precision", False):
         mixed_precision.set_global_policy("mixed_float16")
 
-    train_path = os.path.join(cfg["processed_dir"], "train.tfrecord")
-    block_size = int(cfg["block_size"])
-    batch_size = int(cfg["batch_size"])
+    strategy = get_strategy(cfg)
+    print(f"Using strategy: {type(strategy).__name__}")
+    with strategy.scope():
+        train_path = os.path.join(cfg["processed_dir"], "train.tfrecord")
+        block_size = int(cfg["block_size"])
+        batch_size = int(cfg["batch_size"])
 
-    train_ds = dataset_from_tfrecord(train_path, block_size, batch_size)
+        train_ds = dataset_from_tfrecord(train_path, block_size, batch_size)
 
-    model = build_model(cfg["model_name"])  # T5-like LM
-    loss = losses.SparseCategoricalCrossentropy(from_logits=True)
-    model.compile(optimizer=optimizers.Adam(learning_rate=float(cfg["learning_rate"])), loss=loss)
+        model = build_model(cfg["model_name"])  # T5-like LM
+        loss = losses.SparseCategoricalCrossentropy(from_logits=True)
+        model.compile(optimizer=optimizers.Adam(learning_rate=float(cfg["learning_rate"])), loss=loss)
 
     # Timestamped run directory
     run_ts = datetime.now().strftime("%Y%m%d-%H%M%S")

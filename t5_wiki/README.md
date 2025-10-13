@@ -68,6 +68,8 @@ python -m t5_wiki.src.evaluate --config t5_wiki/configs/default.yaml
 python -m t5_wiki.src.export --config t5_wiki/configs/default.yaml
 ```
 
+python3 -m t5_wiki.scripts.make_test_split --num_lines 1000
+
 View TensorBoard:
 
 ```
