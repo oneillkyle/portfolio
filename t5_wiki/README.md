@@ -56,6 +56,9 @@ Run all steps:
 
 ```
 bash t5_wiki/scripts/run_pipeline.sh --config t5_wiki/configs/default.yaml
+// OR
+
+bash python3 -m t5_wiki.scripts.run_all
 ```
 
 Or step-by-step:
