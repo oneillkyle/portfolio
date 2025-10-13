@@ -79,6 +79,31 @@ View TensorBoard:
 tensorboard --logdir t5_wiki/logs
 ```
 
+## TensorBoard integration
+
+All training, evaluation, test, and tuning metrics are logged to TensorBoard for easy visualization and comparison.
+
+- **Training:**
+  - Logs are written to `t5_wiki/logs/{experiment}/{timestamp}/tensorboard/`
+- **Evaluation:**
+  - Logs are written to `t5_wiki/logs/{experiment}/eval_tensorboard/`
+- **Test:**
+  - Logs are written to `t5_wiki/logs/{experiment}/test_tensorboard/`
+- **Tuning:**
+  - Logs are written to `t5_wiki/logs/tuning/tuning_tensorboard/`
+
+To launch TensorBoard and view all experiment metrics:
+
+```bash
+. .venv/bin/activate
+# From the project root:
+tensorboard --logdir t5_wiki/logs
+```
+
+Open the displayed URL in your browser to explore training curves, validation/test metrics, and compare tuning runs.
+
+You can filter, group, and compare runs by experiment, timestamp, or hyperparameters.
+
 ## notes
 
 - Transform creates labels by shifting input blocks and masking pad positions with -100; training uses `sample_weight` to ignore those.

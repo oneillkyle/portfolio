@@ -1,8 +1,10 @@
 from __future__ import annotations
 import os
 import math
+
 import tensorflow as tf
 from tensorflow.keras import losses, metrics
+from tensorflow.summary import create_file_writer
 
 from .utils import load_config, parse_args
 from .train import dataset_from_tfrecord
@@ -45,7 +47,15 @@ def main() -> None:
 
     loss_val = float(avg_loss.result().numpy())
     ppl = math.exp(loss_val)
+
     print({"loss": loss_val, "perplexity": ppl})
+
+    # TensorBoard logging
+    tb_dir = os.path.join(cfg["log_dir"], exp, "eval_tensorboard")
+    ensure_dir(tb_dir)
+    with create_file_writer(tb_dir).as_default():
+        tf.summary.scalar("eval/loss", loss_val, step=0)
+        tf.summary.scalar("eval/perplexity", ppl, step=0)
 
 
 if __name__ == "__main__":

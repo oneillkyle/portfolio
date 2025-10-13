@@ -23,6 +23,8 @@ param_grid = {
 
 def run_train_and_eval(config, results_file):
     import json
+    import tensorflow as tf
+    from tensorflow.summary import create_file_writer
     run_name = f"lr{config['learning_rate']}_bs{config['batch_size']}_nd{config['noise_density']}_msl{config['mean_span_length']}"
     tmp_cfg = os.path.join(LOG_DIR, f"{run_name}.yaml")
     with open(tmp_cfg, "w") as f:
@@ -43,6 +45,12 @@ def run_train_and_eval(config, results_file):
     with open(results_file, "a") as rf:
         row = {**config, **metrics}
         rf.write(",".join(str(row[k]) for k in row.keys()) + "\n")
+    # TensorBoard logging for tuning
+    tb_dir = os.path.join(LOG_DIR, "tuning_tensorboard")
+    os.makedirs(tb_dir, exist_ok=True)
+    with create_file_writer(tb_dir).as_default():
+        tf.summary.scalar(f"tune/{run_name}/loss", metrics.get("loss", 0), step=0)
+        tf.summary.scalar(f"tune/{run_name}/perplexity", metrics.get("perplexity", 0), step=0)
 
 
 def main():
