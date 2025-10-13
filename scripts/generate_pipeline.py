@@ -261,6 +261,9 @@ class PipelineGenerator:
                 self.template_dir / "scripts" / "visualize_results.py",
                 scripts_dir / "visualize_results.py"
             )
+        
+        # Generate test split script
+        self._generate_test_split_script(scripts_dir, config)
     
     def _generate_run_script(self, scripts_dir: Path, config: Dict[str, Any]):
         """Generate run_pipeline.sh script."""
@@ -269,22 +272,29 @@ set -euo pipefail
 
 CONFIG=${{1:-configs/default.yaml}}
 
-echo "[1/5] Ingest"
+echo "[1/6] Ingest"
 python -m {config["name"]}.src.ingest --config "$CONFIG"
 
-echo "[2/5] Transform"
+echo "[2/6] Transform"
 python -m {config["name"]}.src.transform --config "$CONFIG"
 
-echo "[3/5] Train"
-\techo "[3/5] Train (PyTorch)"
+echo "[2.5/6] Create Test Split"
+python -m {config["name"]}.scripts.make_test_split_pt --config "$CONFIG" --num_lines 1000
+
+echo "[3/6] Train"
+\techo "[3/6] Train (PyTorch)"
 \tpython -m {config["name"]}.src.train_pt --config "$CONFIG"
 
-echo "[4/5] Evaluate"
-\techo "[4/5] Evaluate (PyTorch)"
+echo "[4/6] Evaluate"
+\techo "[4/6] Evaluate (PyTorch)"
 \tpython -m {config["name"]}.src.advanced_eval_pt --config "$CONFIG" || true
 
-echo "[5/5] Export"
-\techo "[5/5] Export (PyTorch)"
+echo "[5/6] Test"
+\techo "[5/6] Test (PyTorch)"
+\tpython -m {config["name"]}.src.test_pt --config "$CONFIG" || true
+
+echo "[6/6] Export"
+\techo "[6/6] Export (PyTorch)"
 \tpython -m {config["name"]}.src.export_pt --config "$CONFIG"
 
 echo "Pipeline complete! 🎉"
@@ -428,6 +438,59 @@ if __name__ == "__main__":
 '''
         
         script_path = scripts_dir / "tune_pt.py"
+        with open(script_path, 'w') as f:
+            f.write(script_content)
+        script_path.chmod(0o755)
+    
+    def _generate_test_split_script(self, scripts_dir: Path, config: Dict[str, Any]):
+        """Generate test split creation script."""
+        script_content = f'''#!/usr/bin/env python3
+"""
+Create a test split from raw data for PyTorch pipeline.
+"""
+import os
+import argparse
+from {config["name"]}.src.utils import load_config, ensure_dir
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default='{config["name"]}/configs/default.yaml')
+    parser.add_argument('--num_lines', type=int, default=1000, help='Number of lines to use for test set')
+    parser.add_argument('--start_line', type=int, default=0, help='Starting line for test set')
+    args = parser.parse_args()
+
+    cfg = load_config(args.config)
+    raw_path = os.path.join(cfg["raw_dir"], os.path.basename(cfg["raw_data_path"]))
+    processed_dir = cfg["processed_dir"]
+    ensure_dir(processed_dir)
+
+    print(f"Creating test split from {{raw_path}}")
+    print(f"Lines: {{args.start_line}} to {{args.start_line + args.num_lines}}")
+    
+    # Read specific lines for test set
+    test_lines = []
+    with open(raw_path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if i >= args.start_line and i < args.start_line + args.num_lines:
+                test_lines.append(line.strip())
+            elif i >= args.start_line + args.num_lines:
+                break
+    
+    # Write test.txt
+    test_path = os.path.join(processed_dir, "test.txt")
+    with open(test_path, "w", encoding="utf-8") as f:
+        for line in test_lines:
+            if line:  # Skip empty lines
+                f.write(line + "\\n")
+    
+    print(f"✅ Created test split: {{test_path}}")
+    print(f"📊 Test samples: {{len(test_lines)}}")
+
+if __name__ == "__main__":
+    main()
+'''
+        
+        script_path = scripts_dir / "make_test_split_pt.py"
         with open(script_path, 'w') as f:
             f.write(script_content)
         script_path.chmod(0o755)
