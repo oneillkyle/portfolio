@@ -5,3 +5,17 @@ logstash_ingest_data
 ai/datasets/*
 ai/saved_models/*
 ai/training_checkpoints/*
+
+# Python venv
+.venv/
+
+# VS Code
+.vscode/
+
+# macOS/Linux editor cruft
+.DS_Store
+*.swp
+*.swo
+
+__pycache__/
+*.pyc

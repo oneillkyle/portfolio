@@ -1,0 +1,28 @@
+# Default configuration for the TF T5 pipeline
+experiment_name: t5_wiki_pretrain_tf
+random_seed: 42
+
+# Data
+raw_data_path: ai/datasets/wiki_corpus.subsample.txt
+output_dir: t5_wiki
+processed_dir: t5_wiki/data/processed
+raw_dir: t5_wiki/data/raw
+
+# Tokenization / chunking
+model_name: t5-small
+max_length: 256
+block_size: 256
+
+# Training
+batch_size: 8
+epochs: 1
+learning_rate: 3e-4
+mixed_precision: true
+
+# Strategy
+strategy: auto  # auto | mirrored | multiworker
+
+# Logging & checkpoints
+log_dir: t5_wiki/logs
+ckpt_dir: t5_wiki/logs/checkpoints
+save_interval: 1000

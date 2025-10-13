@@ -1,0 +1,25 @@
+# Virtual environment (if you keep venv per-project)
+.venv/
+
+# Editor
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# TensorBoard logs and checkpoints
+logs/
+
+# Data artifacts
+data/processed/
+# keep the folder but ignore its contents
+# data/raw is kept with a .gitkeep file
+
+data/raw/*
+!data/raw/.gitkeep
+
+# Exports and models
+exports/
+
+# TFRecords
+**/*.tfrecord
