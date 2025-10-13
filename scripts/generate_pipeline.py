@@ -116,7 +116,7 @@ class PipelineGenerator:
         src_dir = pipeline_dir / "src"
         template_src = self.template_dir / "src"
         
-        # Files to copy and customize
+        # Files to copy and customize  
         source_files = [
             "train_pt.py",
             "evaluate_pt.py", 
@@ -124,7 +124,6 @@ class PipelineGenerator:
             "test_pt.py",
             "export_pt.py",
             "ingest.py",
-            "transform.py",
             "utils.py"
         ]
         
@@ -272,30 +271,23 @@ set -euo pipefail
 
 CONFIG=${{1:-configs/default.yaml}}
 
-echo "[1/6] Ingest"
+echo "[1/4] Ingest"
 python -m {config["name"]}.src.ingest --config "$CONFIG"
 
-echo "[2/6] Transform"
-python -m {config["name"]}.src.transform --config "$CONFIG"
-
-echo "[2.5/6] Create Test Split"
+echo "[2/4] Create Test Split"
 python -m {config["name"]}.scripts.make_test_split_pt --config "$CONFIG" --num_lines 1000
 
-echo "[3/6] Train"
-\techo "[3/6] Train (PyTorch)"
-\tpython -m {config["name"]}.src.train_pt --config "$CONFIG"
+echo "[3/4] Train"
+python -m {config["name"]}.src.train_pt --config "$CONFIG"
 
-echo "[4/6] Evaluate"
-\techo "[4/6] Evaluate (PyTorch)"
-\tpython -m {config["name"]}.src.advanced_eval_pt --config "$CONFIG" || true
+echo "[4/4] Evaluate & Test"
+echo "  Evaluating..."
+python -m {config["name"]}.src.advanced_eval_pt --config "$CONFIG" || true
+echo "  Testing..."
+python -m {config["name"]}.src.test_pt --config "$CONFIG" || true
 
-echo "[5/6] Test"
-\techo "[5/6] Test (PyTorch)"
-\tpython -m {config["name"]}.src.test_pt --config "$CONFIG" || true
-
-echo "[6/6] Export"
-\techo "[6/6] Export (PyTorch)"
-\tpython -m {config["name"]}.src.export_pt --config "$CONFIG"
+echo "[Export] Saving model..."
+python -m {config["name"]}.src.export_pt --config "$CONFIG"
 
 echo "Pipeline complete! 🎉"
 '''
@@ -332,15 +324,22 @@ def main():
     
     steps = [
         f"python3 -m {config['name']}.src.ingest --config {{args.config}}",
-        f"python3 -m {config['name']}.src.transform --config {{args.config}}",
+        f"python3 -m {config['name']}.scripts.make_test_split_pt --config {{args.config}} --num_lines 1000",
         f"python3 -m {config['name']}.src.train_pt --config {{args.config}}",
         f"python3 -m {config['name']}.src.advanced_eval_pt --config {{args.config}}",
+        f"python3 -m {config['name']}.src.test_pt --config {{args.config}}",
         f"python3 -m {config['name']}.src.export_pt --config {{args.config}}"
     ]
     
     for i, step in enumerate(steps, 1):
         print(f"\\n[{{i}}/{{len(steps)}}] {{step.split()[2].split('.')[-1].upper()}}")
-        run(step)
+        try:
+            run(step)
+        except SystemExit:
+            if i <= 3:  # Critical steps: ingest, test split, train
+                raise
+            else:  # Optional steps: evaluate, test, export
+                print(f"⚠️  Step {{i}} failed but continuing...")
     
     print("\\n🎉 Pipeline completed successfully!")
 

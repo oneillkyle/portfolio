@@ -1,27 +1,35 @@
-# PyTorch T5 Pipeline (Recommended)
+# PyTorch T5 Pipeline
 
-The pipeline is now fully supported in PyTorch using Hugging Face Transformers and Datasets. All major steps have a `_pt.py` version:
+Pure PyTorch implementation using Hugging Face Transformers and Datasets with streaming support for large-scale training:
 
-- `src/train_pt.py` — PyTorch training (span corruption, Trainer API, streaming datasets)
-- `src/evaluate_pt.py` — Basic evaluation (perplexity)
-- `src/advanced_eval_pt.py` — Advanced evaluation (ROUGE scores, sample outputs)
-- `src/test_pt.py` — Evaluate on test set
-- `src/export_pt.py` — Export model and tokenizer
+## Pipeline Components
+
+- `src/ingest.py` — Data ingestion and setup
+- `src/train_pt.py` — PyTorch training (span corruption, streaming datasets)
+- `src/advanced_eval_pt.py` — Evaluation (ROUGE scores, sample outputs, file logging)
+- `src/test_pt.py` — Test on held-out data
+- `src/export_pt.py` — Export trained model and tokenizer
+- `scripts/make_test_split_pt.py` — Create test split from raw data
 - `scripts/tune_pt.py` — Hyperparameter tuning (grid search)
-- `scripts/visualize_results.py` — Generate comprehensive visualizations
+- `scripts/visualize_results.py` — Generate training visualizations
 
 ## Quick Start
 
 Run the complete pipeline:
 ```bash
-# Full pipeline (ingest → transform → train → evaluate → export)
+# Full pipeline (ingest → test split → train → evaluate → test → export)
 bash t5_wiki/scripts/run_pipeline.sh t5_wiki/configs/default.yaml
 
-# Or run individual components (orchestrated)
+# Or run with Python orchestration
 python -m t5_wiki.scripts.run_all --config t5_wiki/configs/default.yaml
 ```
 
 ## Individual Components
+
+Create test split:
+```bash
+python -m t5_wiki.scripts.make_test_split_pt --config t5_wiki/configs/default.yaml --num_lines 1000
+```
 
 Train (with streaming for large datasets):
 ```bash
@@ -30,10 +38,6 @@ python -m t5_wiki.src.train_pt --config t5_wiki/configs/default.yaml
 
 Evaluate:
 ```bash
-# Basic evaluation (perplexity)
-python -m t5_wiki.src.evaluate_pt --config t5_wiki/configs/default.yaml
-
-# Advanced evaluation (ROUGE + sample outputs + file logging)
 python -m t5_wiki.src.advanced_eval_pt --config t5_wiki/configs/default.yaml
 ```
 
@@ -108,87 +112,41 @@ tail -f t5_wiki/logs/tensorboard/events.out.tfevents.*
 - **Memory Efficient**: Uses Hugging Face Datasets streaming mode
 - **GPU Optimized**: Automatic device detection and mixed precision support
 
----
-
-# (Legacy) TensorFlow pipeline
-
-End-to-end pipeline to pre-train a T5-style seq2seq model on a raw text corpus using TensorFlow + Hugging Face Transformers.
-
-## layout
-
-t5_wiki/
-- data/
-	- raw/               # raw source files (symlinked/copied during ingest)
-	- processed/         # TFRecord shards written by transform
-- src/
-	- ingest.py          # bring raw text into data/raw
-	- transform.py       # tokenize, chunk, create labels (-100 mask), write TFRecords
-	- model.py           # HF TF model wrapped for Keras (returns logits)
-	- train.py           # tf.data input, masked loss, TensorBoard, checkpoints
-	- evaluate.py        # loss/perplexity on val or train
-	- export.py          # export latest trained checkpoint
-- configs/
-	- default.yaml       # default hyperparameters and paths
-- scripts/
-	- run_pipeline.sh    # ingest -> transform -> train -> evaluate -> export
-	- smoke_test.py      # tiny E2E sanity check
-- logs/                # {experiment}/{timestamp}/{tensorboard,checkpoints}
-
-## prerequisites
+## Prerequisites
 
 - Python 3.10+
-- GPU optional (recommended)
+- GPU recommended for training
 - Install dependencies:
 
-```
+```bash
 python3 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 pip install -r t5_wiki/requirements.txt
 ```
 
-## configuration
-
-`t5_wiki/configs/default.yaml` keys:
-
-- data
-	- `raw_data_path`: path to your raw text (one document per line)
-	- `raw_dir`, `processed_dir`, `output_dir`
-- model/tokenization
-	- `model_name`: e.g. `t5-small`
-	- `max_length`: per-line tokenizer max length
-	- `block_size`: final sequence length in TFRecords
-- training
-	- `batch_size`, `epochs`, `learning_rate`, `mixed_precision`
-- logging
-	- `experiment_name`, `log_dir`
-
-## run the pipeline
-
-Run all steps:
+## Project Structure
 
 ```
-bash t5_wiki/scripts/run_pipeline.sh --config t5_wiki/configs/default.yaml
-// OR
-
-bash python3 -m t5_wiki.scripts.run_all
-```
-
-Or step-by-step:
-
-```
-python -m t5_wiki.src.ingest --config t5_wiki/configs/default.yaml
-python -m t5_wiki.src.transform --config t5_wiki/configs/default.yaml
-python -m t5_wiki.src.train --config t5_wiki/configs/default.yaml
-python -m t5_wiki.src.evaluate --config t5_wiki/configs/default.yaml
-python -m t5_wiki.src.export --config t5_wiki/configs/default.yaml
-```
-
-python3 -m t5_wiki.scripts.make_test_split --num_lines 1000
-
-View TensorBoard:
-
-```
-tensorboard --logdir t5_wiki/logs
+t5_wiki/
+├── data/
+│   ├── raw/               # Raw source files (from ingest)
+│   └── processed/         # Test split (test.txt)
+├── src/
+│   ├── ingest.py         # Data ingestion
+│   ├── train_pt.py       # PyTorch training with streaming
+│   ├── advanced_eval_pt.py # Evaluation with ROUGE & samples
+│   ├── test_pt.py        # Test on held-out data
+│   ├── export_pt.py      # Model export
+│   └── utils.py          # Shared utilities
+├── scripts/
+│   ├── run_pipeline.sh   # Complete pipeline script
+│   ├── run_all.py        # Python pipeline orchestration
+│   ├── make_test_split_pt.py # Create test split
+│   ├── tune_pt.py        # Hyperparameter tuning
+│   └── visualize_results.py # Training visualizations
+├── configs/
+│   └── default.yaml      # Configuration file
+└── logs/                 # Training outputs & checkpoints
 ```
 
 ## Configuration
@@ -248,7 +206,18 @@ For large datasets, the pipeline uses **streaming mode** to avoid loading all da
 - **Configs**: `t5_wiki/logs/tuning_pt/*.yaml` (per experiment)
 - **Plots**: `tuning_results.png` (performance comparison)
 
-## notes
+## Pipeline Flow
 
-- Transform creates labels by shifting input blocks and masking pad positions with -100; training uses `sample_weight` to ignore those.
-- To mimic T5 span corruption, we can add a span-masking step in `transform.py` and adjust labels accordingly.
+1. **Ingest**: Copy raw data to pipeline directory
+2. **Test Split**: Create held-out test set from raw data  
+3. **Train**: PyTorch training with streaming datasets and span corruption
+4. **Evaluate**: Generate sample outputs and compute ROUGE scores
+5. **Test**: Evaluate on held-out test data
+6. **Export**: Save trained model and tokenizer
+
+## Notes
+
+- **Streaming**: Handles large datasets without loading all data into memory
+- **Span Corruption**: T5-style pretraining with masked span prediction
+- **No Transform Step**: Preprocessing happens during training for efficiency
+- **Memory Efficient**: Uses Hugging Face Datasets streaming mode
