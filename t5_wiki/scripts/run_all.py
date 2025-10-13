@@ -19,15 +19,14 @@ def main():
     args = parser.parse_args()
 
     run(f"python3 -m t5_wiki.src.ingest --config {args.config}")
-    run(f"python3 -m t5_wiki.src.transform --config {args.config}")
     if not args.skip_test_split:
         run(f"python3 -m t5_wiki.scripts.make_test_split --config {args.config}")
-    run(f"python3 -m t5_wiki.src.train --config {args.config}")
-    run(f"python3 -m t5_wiki.src.evaluate --config {args.config}")
+    run(f"python3 -m t5_wiki.src.train_pt --config {args.config}")
+    run(f"python3 -m t5_wiki.src.evaluate_pt --config {args.config}")
     if args.test:
-        run(f"python3 -m t5_wiki.src.test --config {args.config}")
+        run(f"python3 -m t5_wiki.src.test_pt --config {args.config}")
     if args.tune:
-        run(f"python3 t5_wiki/scripts/tune.py")
+        run(f"python3 t5_wiki/scripts/tune_pt.py")
 
 if __name__ == "__main__":
     main()
