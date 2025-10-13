@@ -22,7 +22,7 @@ def main():
     # if not args.skip_test_split:
     #     run(f"python3 -m t5_wiki.scripts.make_test_split --config {args.config}")
     run(f"python3 -m t5_wiki.src.train_pt --config {args.config}")
-    run(f"python3 -m t5_wiki.src.evaluate_pt --config {args.config}")
+    run(f"python3 -m t5_wiki.src.advanced_eval_pt --config {args.config}")
     if args.test:
         run(f"python3 -m t5_wiki.src.test_pt --config {args.config}")
     if args.tune:

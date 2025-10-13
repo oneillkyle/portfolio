@@ -128,8 +128,9 @@ def main():
         eval_strategy="epoch",
         save_strategy="epoch",
         logging_dir=os.path.join(cfg["log_dir"], "tensorboard"),
-        report_to=["tensorboard"],
+        report_to=["tensorboard", "wandb"] if cfg.get("use_wandb", False) else ["tensorboard"],
         fp16=cfg.get("mixed_precision", False),
+        run_name=cfg.get("run_name", "t5-wiki-training"),
     )
 
     trainer = Trainer(
