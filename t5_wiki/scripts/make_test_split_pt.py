@@ -14,7 +14,21 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    raw_path = os.path.join(cfg["raw_dir"], os.path.basename(cfg["raw_data_path"]))
+    # Robustly resolve the raw data path
+    raw_cfg = cfg["raw_data_path"]
+    candidates = []
+    if os.path.isabs(raw_cfg):
+        candidates.append(raw_cfg)
+    else:
+        candidates.append(os.path.abspath(raw_cfg))
+    candidates.append(os.path.join(cfg.get("raw_dir", ""), os.path.basename(raw_cfg)))
+    raw_path = None
+    for p in candidates:
+        if p and os.path.exists(p):
+            raw_path = p
+            break
+    if raw_path is None:
+        raise FileNotFoundError(f"Could not locate raw_data_path. Tried: {candidates}. Run ingest first: python -m t5_wiki.src.ingest --config {args.config}")
     processed_dir = cfg["processed_dir"]
     ensure_dir(processed_dir)
 

@@ -10,7 +10,10 @@ def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
 
-    raw_src = cfg["raw_data_path"]
+    # Read source path and raw_dir; allow backwards compatibility if source_data_path is missing
+    raw_src = cfg.get("source_data_path", cfg.get("raw_data_path"))
+    if not raw_src or not isinstance(raw_src, str):
+        raise ValueError("source_data_path/raw_data_path is missing or invalid in config")
     raw_dir = cfg["raw_dir"]
     ensure_dir(raw_dir)
 
@@ -21,7 +24,19 @@ def main() -> None:
             os.symlink(os.path.abspath(raw_src), dst)
         except OSError:
             shutil.copy2(raw_src, dst)
-    print(f"Ingested raw file -> {dst}")
+    # If config has raw_data_path pointing elsewhere, rewrite it to canonical location
+    cfg_path = args.config
+    try:
+        import yaml
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        data["raw_data_path"] = dst
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+        print(f"Ingested raw file -> {dst} (updated raw_data_path in {cfg_path})")
+    except Exception as e:
+        # Non-fatal; continue
+        print(f"Ingested raw file -> {dst} (could not update config: {e})")
 
 
 if __name__ == "__main__":

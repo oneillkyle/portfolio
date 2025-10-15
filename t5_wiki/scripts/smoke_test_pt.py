@@ -9,8 +9,22 @@ from t5_wiki.src.utils import load_config, ensure_dir
 
 def main():
     cfg = load_config("t5_wiki/configs/default.yaml")
-    raw_path = cfg["raw_data_path"]
-    assert os.path.exists(raw_path), f"Missing raw file: {raw_path}"
+
+    # Robustly resolve the raw data path
+    raw_cfg = cfg["raw_data_path"]
+    candidates = []
+    if os.path.isabs(raw_cfg):
+        candidates.append(raw_cfg)
+    else:
+        candidates.append(os.path.abspath(raw_cfg))
+    candidates.append(os.path.join(cfg.get("raw_dir", ""), os.path.basename(raw_cfg)))
+    raw_path = None
+    for p in candidates:
+        if p and os.path.exists(p):
+            raw_path = p
+            break
+    if raw_path is None:
+        raise FileNotFoundError(f"Could not locate raw_data_path for smoke test. Tried: {candidates}")
 
     # Take a tiny subset
     with open(raw_path, "r", encoding="utf-8") as f:
@@ -33,7 +47,7 @@ def main():
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
         num_train_epochs=1,
-        eval_strategy="epoch",
+        evaluation_strategy="epoch",
         logging_dir="t5_wiki/logs/smoke_pt/tensorboard",
         report_to=["tensorboard"],
     )

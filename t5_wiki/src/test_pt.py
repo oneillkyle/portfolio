@@ -15,8 +15,21 @@ def main():
         with open(test_path, "r", encoding="utf-8") as f:
             lines = [line.strip() for line in f if line.strip()]
     else:
-        # Fallback: use a portion of the raw data
-        raw_path = os.path.join(cfg["raw_dir"], os.path.basename(cfg["raw_data_path"]))
+        # Fallback: use a portion of the raw data with robust path resolution
+        raw_cfg = cfg["raw_data_path"]
+        candidates = []
+        if os.path.isabs(raw_cfg):
+            candidates.append(raw_cfg)
+        else:
+            candidates.append(os.path.abspath(raw_cfg))
+        candidates.append(os.path.join(cfg.get("raw_dir", ""), os.path.basename(raw_cfg)))
+        raw_path = None
+        for p in candidates:
+            if p and os.path.exists(p):
+                raw_path = p
+                break
+        if raw_path is None:
+            raise FileNotFoundError(f"Could not locate raw_data_path for testing. Tried: {candidates}")
         with open(raw_path, "r", encoding="utf-8") as f:
             lines = [line.strip() for i, line in enumerate(f) if line.strip() and i % 20 == 0]
     dataset = Dataset.from_dict({"text": lines})

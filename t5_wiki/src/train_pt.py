@@ -68,7 +68,26 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     print("[LOG] Starting data load...")
-    raw_path = os.path.join(cfg["raw_dir"], os.path.basename(cfg["raw_data_path"]))
+    # Resolve raw data file path robustly:
+    # 1) Use cfg["raw_data_path"] directly if it exists (absolute or relative)
+    # 2) Fallback to raw_dir + basename(raw_data_path)
+    raw_data_path = cfg["raw_data_path"]
+    candidate_paths = []
+    if os.path.isabs(raw_data_path):
+        candidate_paths.append(raw_data_path)
+    else:
+        candidate_paths.append(os.path.abspath(raw_data_path))
+    # Fallback location inside configured raw_dir
+    candidate_paths.append(os.path.join(cfg.get("raw_dir", ""), os.path.basename(raw_data_path)))
+
+    raw_path = None
+    for p in candidate_paths:
+        if p and os.path.exists(p):
+            raw_path = p
+            break
+    if raw_path is None:
+        raise FileNotFoundError(f"Could not locate raw_data_path. Tried: {candidate_paths}")
+    print(f"[LOG] Using raw data file: {raw_path}")
 
     # Use streaming mode for large datasets
     print("[LOG] Loading dataset in streaming mode...")
@@ -113,24 +132,34 @@ def main():
     from itertools import islice
     val_size = int(cfg.get("val_size", 1000))
     val_ds = dataset.take(val_size)
-    train_ds = dataset.skip(val_size)
+    # Shuffle the streaming training dataset with a buffer for better mixing
+    train_ds = dataset.skip(val_size).shuffle(buffer_size=10000, seed=int(cfg.get("random_seed", 42)))
 
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
     # For streaming datasets, set max_steps instead of num_train_epochs
-    # 10,000 is a good default for large-scale pretraining; adjust as needed
+    max_steps = int(cfg.get("max_steps", 10000))  # Read from config or default to 10,000
+    step_interval = int(cfg.get("save_interval", 1000))
+    logging_steps = int(cfg.get("logging_steps", max(50, step_interval // 10)))
+
     training_args = TrainingArguments(
         output_dir=cfg["log_dir"],
         per_device_train_batch_size=int(cfg["batch_size"]),
         per_device_eval_batch_size=int(cfg["batch_size"]),
-        max_steps=10000,  # Set your desired number of steps
+        max_steps=max_steps,
         learning_rate=float(cfg["learning_rate"]),
-        eval_strategy="epoch",
-        save_strategy="epoch",
+        eval_strategy="steps",  # Use steps for streaming datasets
+        save_strategy="steps",
+        eval_steps=step_interval,
+        save_steps=step_interval,
+        logging_steps=logging_steps,
         logging_dir=os.path.join(cfg["log_dir"], "tensorboard"),
         report_to=["tensorboard", "wandb"] if cfg.get("use_wandb", False) else ["tensorboard"],
         fp16=cfg.get("mixed_precision", False),
         run_name=cfg.get("run_name", "t5-wiki-training"),
+        seed=int(cfg.get("random_seed", 42)),
+        data_seed=int(cfg.get("random_seed", 42)),
+        save_total_limit=int(cfg.get("save_total_limit", 3)),
     )
 
     trainer = Trainer(

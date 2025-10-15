@@ -155,8 +155,9 @@ Key settings in `t5_wiki/configs/default.yaml`:
 
 ### Data & Model
 ```yaml
-raw_data_path: ai/datasets/wiki_corpus.subsample.txt  # Input text file
-model_name: t5-small                                  # HF model to fine-tune
+source_data_path: ai/datasets/wiki_corpus.txt         # Original data file (outside pipeline)
+raw_data_path: t5_wiki/data/raw/wiki_corpus.txt       # Canonical location after ingest
+model_name: t5-base                                   # HF model to fine-tune
 block_size: 256                                       # Sequence length
 val_size: 2000                                        # Validation split size
 ```
