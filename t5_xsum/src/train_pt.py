@@ -1,5 +1,5 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Trainer, TrainingArguments, DataCollatorForSeq2Seq
-from datasets import load_dataset, Dataset, load_from_disk
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Trainer, TrainingArguments
+from datasets import load_dataset, Dataset
 import numpy as np
 import os
 import yaml
@@ -89,31 +89,15 @@ def main():
         raise FileNotFoundError(f"Could not locate raw_data_path. Tried: {candidate_paths}")
     print(f"[LOG] Using raw data file: {raw_path}")
 
-    # Try cached tokenized dataset first for maximum throughput
-    tokenized_dir = cfg.get("tokenized_dir", "t5_wiki/data/tokenized")
-    ds_cached = None
-    if os.path.exists(tokenized_dir):
-        try:
-            ds_cached = load_from_disk(tokenized_dir)
-            print(f"[LOG] Loaded cached dataset from {tokenized_dir}")
-        except Exception as e:
-            print(f"[LOG] Failed to load cached dataset: {e}")
-
-    if ds_cached is not None:
-        # Non-streaming, already tokenized
-        full_ds = ds_cached
-        is_streaming = False
-    else:
-        # Fallback: streaming raw text (slower)
-        print("[LOG] Loading dataset in streaming mode...")
-        full_ds = load_dataset(
-            "text",
-            data_files={"train": raw_path},
-            split="train",
-            streaming=True
-        )
-        is_streaming = True
-        print("[LOG] Streaming dataset loaded.")
+    # Use streaming mode for large datasets
+    print("[LOG] Loading dataset in streaming mode...")
+    dataset = load_dataset(
+        "text",
+        data_files={"train": raw_path},
+        split="train",
+        streaming=True
+    )
+    print("[LOG] Streaming dataset loaded.")
 
     # Map preprocessing (tokenization, span corruption)
     def preprocess(example):
@@ -141,24 +125,15 @@ def main():
         return {"input_ids": input_ids.tolist(), "labels": target_ids.tolist()}
 
     print("[LOG] Applying preprocessing...")
-    if is_streaming:
-        dataset = full_ds.map(preprocess)
-    else:
-        # Already tokenized
-        dataset = full_ds
+    dataset = dataset.map(preprocess)
     print("[LOG] Preprocessing complete.")
 
     # Split train/val using islice for streaming datasets
     from itertools import islice
     val_size = int(cfg.get("val_size", 1000))
-    if is_streaming:
-        val_ds = dataset.take(val_size)
-        # Shuffle the streaming training dataset with a buffer for better mixing
-        train_ds = dataset.skip(val_size).shuffle(buffer_size=10000, seed=int(cfg.get("random_seed", 42)))
-    else:
-        # Non-streaming random split
-        split = dataset.train_test_split(test_size=val_size, seed=int(cfg.get("random_seed", 42)))
-        train_ds, val_ds = split["train"], split["test"]
+    val_ds = dataset.take(val_size)
+    # Shuffle the streaming training dataset with a buffer for better mixing
+    train_ds = dataset.skip(val_size).shuffle(buffer_size=10000, seed=int(cfg.get("random_seed", 42)))
 
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
@@ -173,7 +148,7 @@ def main():
         per_device_eval_batch_size=int(cfg["batch_size"]),
         max_steps=max_steps,
         learning_rate=float(cfg["learning_rate"]),
-        evaluation_strategy="steps",  # Use steps for progress
+        eval_strategy="steps",  # Use steps for streaming datasets
         save_strategy="steps",
         eval_steps=step_interval,
         save_steps=step_interval,
@@ -185,17 +160,13 @@ def main():
         seed=int(cfg.get("random_seed", 42)),
         data_seed=int(cfg.get("random_seed", 42)),
         save_total_limit=int(cfg.get("save_total_limit", 3)),
-        dataloader_num_workers=int(cfg.get("dataloader_num_workers", 0)),
-        dataloader_pin_memory=True,
     )
 
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        data_collator=data_collator,
     )
     trainer.train()
     trainer.save_model(cfg["log_dir"])

@@ -23,6 +23,7 @@ def main():
 
     steps = [
         f"python3 -m t5_wiki.src.ingest --config {args.config}",
+        f"python3 -m t5_wiki.src.preprocess_cache --config {args.config}",
         f"python3 -m t5_wiki.scripts.make_test_split_pt --config {args.config} --num_lines 1000",
         f"python3 -m t5_wiki.src.train_pt --config {args.config}",
         f"python3 -m t5_wiki.src.advanced_eval_pt --config {args.config}",

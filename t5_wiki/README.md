@@ -36,6 +36,15 @@ Train (with streaming for large datasets):
 python -m t5_wiki.src.train_pt --config t5_wiki/configs/default.yaml
 ```
 
+Preprocess and cache (recommended for full-dataset training):
+```bash
+# Builds a tokenized, span-corrupted Arrow dataset once, then training is much faster
+python -m t5_wiki.src.preprocess_cache --config t5_wiki/configs/default.yaml
+
+# Rebuild if already exists
+python -m t5_wiki.src.preprocess_cache --config t5_wiki/configs/default.yaml --force
+```
+
 Evaluate:
 ```bash
 python -m t5_wiki.src.advanced_eval_pt --config t5_wiki/configs/default.yaml
@@ -160,6 +169,9 @@ raw_data_path: t5_wiki/data/raw/wiki_corpus.txt       # Canonical location after
 model_name: t5-base                                   # HF model to fine-tune
 block_size: 256                                       # Sequence length
 val_size: 2000                                        # Validation split size
+tokenized_dir: t5_wiki/data/tokenized                 # Cached Arrow dataset (built by preprocess)
+num_proc: 4                                           # Parallelism for preprocessing
+dataloader_num_workers: 4                             # DataLoader workers for training
 ```
 
 ### Training
@@ -179,11 +191,16 @@ log_dir: t5_wiki/logs             # Local log directory
 
 ## Memory Management
 
-For large datasets, the pipeline uses **streaming mode** to avoid loading all data into RAM:
+For large datasets, you have two efficient options:
 
-- Datasets are loaded incrementally during training
-- Only `val_size` examples are kept in memory for validation
-- Supports datasets of any size without OOM errors
+1) **Preprocess + Cache (fastest training):**
+  - Run `preprocess_cache` once to create a tokenized Arrow dataset
+  - Training then reads the cached dataset with parallel DataLoader workers
+
+2) **Streaming Mode (no preprocessing):**
+  - Datasets are loaded incrementally during training
+  - Only `val_size` examples are kept in memory for validation
+  - Supports datasets of any size without OOM errors (slower per step)
 
 ## Output Files & Logs
 
