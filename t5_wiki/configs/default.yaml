@@ -1,7 +1,7 @@
 experiment_name: t5_wiki_pretrain_tf
 random_seed: 42
-source_data_path: ai/datasets/wiki_corpus.txt
-raw_data_path: t5_wiki/data/raw/wiki_corpus.txt
+source_data_path: ai/datasets/wiki_corpus.subsample.txt
+raw_data_path: t5_wiki/data/raw/wiki_corpus.subsample.txt
 output_dir: t5_wiki
 processed_dir: t5_wiki/data/processed
 raw_dir: t5_wiki/data/raw
@@ -12,7 +12,11 @@ tokenized_dir: t5_wiki/data/tokenized
 # Parallelism for preprocessing and dataloading
 num_proc: 4
 dataloader_num_workers: 4
-batch_size: 16
+batch_size: 8  # Reduced for RTX 3070 Laptop (8GB VRAM)
+# Speed optimizations
+gradient_accumulation_steps: 8  # Effective batch = 8 * 8 = 64 (same total)
+per_device_eval_batch_size: 16  # Moderate eval batches
+eval_accumulation_steps: 4  # Accumulate eval to avoid memory issues
 epochs: 1
 learning_rate: 1e-4
 noise_density: 0.25

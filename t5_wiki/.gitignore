@@ -12,6 +12,7 @@ logs/
 
 # Data artifacts
 data/processed/
+data/tokenized/
 # keep the folder but ignore its contents
 # data/raw is kept with a .gitkeep file
 

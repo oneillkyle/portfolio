@@ -170,10 +170,12 @@ def main():
     training_args = TrainingArguments(
         output_dir=cfg["log_dir"],
         per_device_train_batch_size=int(cfg["batch_size"]),
-        per_device_eval_batch_size=int(cfg["batch_size"]),
+        per_device_eval_batch_size=int(cfg.get("per_device_eval_batch_size", cfg["batch_size"])),
+        gradient_accumulation_steps=int(cfg.get("gradient_accumulation_steps", 1)),
+        eval_accumulation_steps=int(cfg.get("eval_accumulation_steps", 1)),
         max_steps=max_steps,
         learning_rate=float(cfg["learning_rate"]),
-        evaluation_strategy="steps",  # Use steps for progress
+        eval_strategy="steps",  # Use steps for progress
         save_strategy="steps",
         eval_steps=step_interval,
         save_steps=step_interval,
@@ -187,6 +189,17 @@ def main():
         save_total_limit=int(cfg.get("save_total_limit", 3)),
         dataloader_num_workers=int(cfg.get("dataloader_num_workers", 0)),
         dataloader_pin_memory=True,
+        # Speed optimizations
+        gradient_checkpointing=True,  # Save memory at slight speed cost
+        optim="adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch",
+        warmup_steps=500,
+        weight_decay=0.01,
+        max_grad_norm=1.0,
+        logging_first_step=True,
+        load_best_model_at_end=False,  # Skip to avoid slowdowns
+        # Memory optimizations for 8GB GPU
+        tf32=True if torch.cuda.is_available() else False,  # Faster matmuls on Ampere+
+        ddp_find_unused_parameters=False,
     )
 
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
