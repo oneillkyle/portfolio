@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Trainer, TrainingArguments, DataCollatorForSeq2Seq
 from datasets import load_dataset, Dataset
-from typing import cast
+from typing import cast, Optional
 import math
 import numpy as np
 import os
@@ -69,6 +69,20 @@ def main():
     model_name = cfg["model_name"]
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    # Optional TF32 for speed on Ampere+; disabled when debug_numerics is True
+    allow_tf32_cfg = bool(cfg.get("allow_tf32", True))
+    debug_numerics = bool(cfg.get("debug_numerics", True))
+    if allow_tf32_cfg and not debug_numerics and torch.cuda.is_available():
+        try:
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            # PyTorch 2.x API to pick precision policy
+            if hasattr(torch, "set_float32_matmul_precision"):
+                torch.set_float32_matmul_precision("high")
+            print("[DEBUG] TF32 enabled for matmul and cuDNN")
+        except Exception as e:
+            print(f"[DEBUG] Could not enable TF32: {e}")
+
     print("[DEBUG] Starting data load...")
     train_ds = cast(Dataset, load_dataset("EdinburghNLP/xsum", split="train", revision="main"))
     val_ds = cast(Dataset, load_dataset("EdinburghNLP/xsum", split="validation", revision="main"))
@@ -96,34 +110,54 @@ def main():
     print("[DEBUG] Model loaded.")
 
     # For streaming datasets, set max_steps instead of num_train_epochs
-    max_steps = int(cfg.get("max_steps", 10000))  # Read from config or default to 10,000
-    step_interval = int(cfg.get("save_interval", 1000))
-    logging_steps = int(cfg.get("logging_steps", max(50, step_interval // 10)))
+    # Use diagnostic_mode to disable eval/save/logging for fast iteration
+    diagnostic_mode = bool(cfg.get("diagnostic_mode", False))
+    max_steps = int(cfg.get("max_steps", 10000))
+    
+    # Higher default intervals to avoid frequent eval/save stalls
+    step_interval = int(cfg.get("save_interval", cfg.get("eval_steps", 5000)))
+    eval_steps = int(cfg.get("eval_steps", step_interval))
+    save_steps = int(cfg.get("save_steps", step_interval))
+    logging_steps = int(cfg.get("logging_steps", 100))
 
     # If debug_numerics is enabled, force full precision
-    debug_numerics = bool(cfg.get("debug_numerics", True))
+    # Build TrainingArguments via kwargs so we can conditionally include fields
+    num_workers = int(cfg.get("num_workers", max(1, (os.cpu_count() or 2)//2)))
+    pin_memory = bool(cfg.get("pin_memory", True)) and torch.cuda.is_available()
+    persistent_workers = bool(cfg.get("persistent_workers", True)) if num_workers > 0 else False
+    disable_wandb = bool(cfg.get("disable_wandb", False))
+    report_targets = ["none"] if diagnostic_mode else (["tensorboard"] if disable_wandb else (["tensorboard", "wandb"] if cfg.get("use_wandb", False) else ["tensorboard"]))
 
-    training_args = TrainingArguments(
+    args_kwargs = dict(
         output_dir=cfg["log_dir"],
         per_device_train_batch_size=int(cfg["batch_size"]),
         per_device_eval_batch_size=int(cfg["batch_size"]),
         max_steps=max_steps,
         learning_rate=float(cfg["learning_rate"]),
-        eval_strategy="steps",  # Use steps for streaming datasets
-        save_strategy="steps",
-        eval_steps=step_interval,
-        save_steps=step_interval,
+        warmup_steps=int(cfg.get("warmup_steps", 0)),
+        eval_strategy="no" if diagnostic_mode else "steps",
+        save_strategy="no" if diagnostic_mode else "steps",
+        eval_steps=None if diagnostic_mode else eval_steps,
+        save_steps=None if diagnostic_mode else save_steps,
         logging_steps=logging_steps,
         logging_dir=os.path.join(cfg["log_dir"], "tensorboard"),
-        report_to=["tensorboard", "wandb"] if cfg.get("use_wandb", False) else ["tensorboard"],
+        report_to=report_targets,
         fp16=False if debug_numerics else cfg.get("mixed_precision", False),
         bf16=False if debug_numerics else bool(cfg.get("bf16", False)),
         max_grad_norm=float(cfg.get("max_grad_norm", 1.0)),
+        gradient_accumulation_steps=int(cfg.get("grad_accum_steps", 1)),
+        dataloader_num_workers=num_workers,
+        dataloader_pin_memory=pin_memory,
+        dataloader_persistent_workers=persistent_workers,
         run_name=cfg.get("run_name", "t5-xsum-training"),
         seed=int(cfg.get("random_seed", 42)),
         data_seed=int(cfg.get("random_seed", 42)),
         save_total_limit=int(cfg.get("save_total_limit", 3)),
     )
+    if num_workers > 0:
+        args_kwargs["dataloader_prefetch_factor"] = int(cfg.get("prefetch_factor", 2))
+
+    training_args = TrainingArguments(**args_kwargs)
 
     # Use DataCollatorForSeq2Seq to properly pad batches
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
@@ -252,15 +286,73 @@ def main():
             if bad:
                 control.should_training_stop = True
                 print("[ERROR] Stopping training due to suspicious logs (zero/NaN).")
+
+    class PerfMonitorCallback(TrainerCallback):
+        def __init__(self):
+            self._last_step = None
+            self._last_time = None
+            self.stop_reason = None
+
+        def on_step_begin(self, args, state, control, **kwargs):
+            import time
+            self._last_step = state.global_step
+            self._last_time = time.time()
+
+        def on_step_end(self, args, state, control, **kwargs):
+            import time
+            now = time.time()
+            if self._last_time is not None:
+                dt = now - self._last_time
+                print(f"[PERF] Step {state.global_step} took {dt:.3f}s")
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                mem = torch.cuda.max_memory_allocated() / (1024**3)
+                print(f"[PERF] CUDA max_memory_allocated ~ {mem:.2f} GB")
+
+        def on_train_end(self, args, state, control, **kwargs):
+            reason = getattr(control, 'should_training_stop', False)
+            print(f"[PERF] Training ended. should_training_stop={reason}")
+
+    class LongOpWatchdog(TrainerCallback):
+        def __init__(self, step_timeout: Optional[float] = None):
+            self.step_timeout = step_timeout or float(cfg.get("step_timeout_secs", 60))
+            self._step_start_time = None
+            self._last_dump_time = None
+        def on_step_begin(self, args, state, control, **kwargs):
+            import time
+            self._step_start_time = time.time()
+            self._last_dump_time = self._step_start_time
+        def on_step_end(self, args, state, control, **kwargs):
+            self._step_start_time = None
+            self._last_dump_time = None
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            # Evaluate potential stall mid-step
+            if self._step_start_time is None:
+                return
+            import time, threading, traceback, sys
+            elapsed = time.time() - self._step_start_time
+            if elapsed > self.step_timeout:
+                now = time.time()
+                if self._last_dump_time is None or (now - self._last_dump_time) >= 10:
+                    self._last_dump_time = now
+                    print(f"[WATCHDOG] Step {state.global_step} exceeding {self.step_timeout:.1f}s (elapsed {elapsed:.1f}s); dumping stack traces.")
+                    for thread_id, frame in sys._current_frames().items():
+                        print(f"[WATCHDOG] Thread {thread_id} stack:")
+                        traceback.print_stack(frame)
+                    # Stop after first full dump to allow analysis
+                    control.should_training_stop = True
+                    print("[WATCHDOG] Requesting training stop due to stall.")
     trainer = NaNSafeTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
-        eval_dataset=val_ds,
+        eval_dataset=None if diagnostic_mode else val_ds,
         data_collator=data_collator,
     )
     trainer.add_callback(NumericsGuardCallback())
     trainer.add_callback(LogWatchCallback())
+    trainer.add_callback(PerfMonitorCallback())
+    trainer.add_callback(LongOpWatchdog())
     print("[DEBUG] Starting training...")
     trainer.train()
     print("[DEBUG] Training complete. Saving model...")
