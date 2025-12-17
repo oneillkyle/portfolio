@@ -1,0 +1,49 @@
+experiment_name: t5_xsum_pretrain
+random_seed: 42
+raw_data_path: xsum
+output_dir: t5_xsum
+processed_dir: t5_xsum/data/processed
+raw_dir: t5_xsum/data/raw
+model_name: t5-base
+max_length: 256
+block_size: 256
+batch_size: 8
+epochs: 1
+learning_rate: 0.00003  # Lower further for fp16 stability
+mixed_precision: false  # Disable fp16; use bf16 instead
+bf16: true  # Better numerical stability than fp16
+val_size: 2000
+strategy: auto
+log_dir: t5_xsum/logs
+ckpt_dir: t5_xsum/logs/checkpoints
+save_interval: 1000
+run_name: t5_xsum-seq2seq
+noise_density: 0.15
+mean_span_length: 3
+
+# Performance
+num_workers: 4
+pin_memory: true
+persistent_workers: true
+prefetch_factor: 2
+grad_accum_steps: 2
+allow_tf32: true  # Re-enable TF32 for speed
+
+# Stability
+debug_numerics: false  # Allow bf16+TF32
+max_grad_norm: 0.5  # Tighter gradient clipping
+step_timeout_secs: 120
+warmup_steps: 1000  # Longer warmup for safer LR ramp
+
+# Training schedule
+max_steps: 10000
+eval_steps: 5000
+save_steps: 5000
+logging_steps: 100
+
+# Logging
+disable_wandb: true  # Disable wandb due to network timeouts
+use_wandb: false
+
+# Debug (when needed)
+diagnostic_mode: false  # set true to disable eval/save/logging

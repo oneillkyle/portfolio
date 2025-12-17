@@ -1,5 +1,5 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Trainer, TrainingArguments
-from datasets import load_dataset, Dataset
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Trainer, TrainingArguments, DataCollatorForSeq2Seq
+from datasets import load_dataset, Dataset, load_from_disk
 import numpy as np
 import os
 import yaml
@@ -89,15 +89,31 @@ def main():
         raise FileNotFoundError(f"Could not locate raw_data_path. Tried: {candidate_paths}")
     print(f"[LOG] Using raw data file: {raw_path}")
 
-    # Use streaming mode for large datasets
-    print("[LOG] Loading dataset in streaming mode...")
-    dataset = load_dataset(
-        "text",
-        data_files={"train": raw_path},
-        split="train",
-        streaming=True
-    )
-    print("[LOG] Streaming dataset loaded.")
+    # Try cached tokenized dataset first for maximum throughput
+    tokenized_dir = cfg.get("tokenized_dir", "t5_wiki/data/tokenized")
+    ds_cached = None
+    if os.path.exists(tokenized_dir):
+        try:
+            ds_cached = load_from_disk(tokenized_dir)
+            print(f"[LOG] Loaded cached dataset from {tokenized_dir}")
+        except Exception as e:
+            print(f"[LOG] Failed to load cached dataset: {e}")
+
+    if ds_cached is not None:
+        # Non-streaming, already tokenized
+        full_ds = ds_cached
+        is_streaming = False
+    else:
+        # Fallback: streaming raw text (slower)
+        print("[LOG] Loading dataset in streaming mode...")
+        full_ds = load_dataset(
+            "text",
+            data_files={"train": raw_path},
+            split="train",
+            streaming=True
+        )
+        is_streaming = True
+        print("[LOG] Streaming dataset loaded.")
 
     # Map preprocessing (tokenization, span corruption)
     def preprocess(example):
@@ -125,15 +141,24 @@ def main():
         return {"input_ids": input_ids.tolist(), "labels": target_ids.tolist()}
 
     print("[LOG] Applying preprocessing...")
-    dataset = dataset.map(preprocess)
+    if is_streaming:
+        dataset = full_ds.map(preprocess)
+    else:
+        # Already tokenized
+        dataset = full_ds
     print("[LOG] Preprocessing complete.")
 
     # Split train/val using islice for streaming datasets
     from itertools import islice
     val_size = int(cfg.get("val_size", 1000))
-    val_ds = dataset.take(val_size)
-    # Shuffle the streaming training dataset with a buffer for better mixing
-    train_ds = dataset.skip(val_size).shuffle(buffer_size=10000, seed=int(cfg.get("random_seed", 42)))
+    if is_streaming:
+        val_ds = dataset.take(val_size)
+        # Shuffle the streaming training dataset with a buffer for better mixing
+        train_ds = dataset.skip(val_size).shuffle(buffer_size=10000, seed=int(cfg.get("random_seed", 42)))
+    else:
+        # Non-streaming random split
+        split = dataset.train_test_split(test_size=val_size, seed=int(cfg.get("random_seed", 42)))
+        train_ds, val_ds = split["train"], split["test"]
 
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
@@ -145,10 +170,12 @@ def main():
     training_args = TrainingArguments(
         output_dir=cfg["log_dir"],
         per_device_train_batch_size=int(cfg["batch_size"]),
-        per_device_eval_batch_size=int(cfg["batch_size"]),
+        per_device_eval_batch_size=int(cfg.get("per_device_eval_batch_size", cfg["batch_size"])),
+        gradient_accumulation_steps=int(cfg.get("gradient_accumulation_steps", 1)),
+        eval_accumulation_steps=int(cfg.get("eval_accumulation_steps", 1)),
         max_steps=max_steps,
         learning_rate=float(cfg["learning_rate"]),
-        eval_strategy="steps",  # Use steps for streaming datasets
+        eval_strategy="steps",  # Use steps for progress
         save_strategy="steps",
         eval_steps=step_interval,
         save_steps=step_interval,
@@ -160,13 +187,28 @@ def main():
         seed=int(cfg.get("random_seed", 42)),
         data_seed=int(cfg.get("random_seed", 42)),
         save_total_limit=int(cfg.get("save_total_limit", 3)),
+        dataloader_num_workers=int(cfg.get("dataloader_num_workers", 0)),
+        dataloader_pin_memory=True,
+        # Speed optimizations
+        gradient_checkpointing=True,  # Save memory at slight speed cost
+        optim="adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch",
+        warmup_steps=500,
+        weight_decay=0.01,
+        max_grad_norm=1.0,
+        logging_first_step=True,
+        load_best_model_at_end=False,  # Skip to avoid slowdowns
+        # Memory optimizations for 8GB GPU
+        tf32=True if torch.cuda.is_available() else False,  # Faster matmuls on Ampere+
+        ddp_find_unused_parameters=False,
     )
 
+    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
+        data_collator=data_collator,
     )
     trainer.train()
     trainer.save_model(cfg["log_dir"])

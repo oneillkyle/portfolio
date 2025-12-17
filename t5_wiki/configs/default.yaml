@@ -1,39 +1,32 @@
-# Default configuration for the TF T5 pipeline
 experiment_name: t5_wiki_pretrain_tf
 random_seed: 42
-
-# Data
-# Source location of the corpus (outside the pipeline's raw folder)
-source_data_path: ai/datasets/wiki_corpus.txt
-# Canonical location inside the pipeline after ingest
-raw_data_path: t5_wiki/data/raw/wiki_corpus.txt
+source_data_path: ai/datasets/wiki_corpus.subsample.txt
+raw_data_path: t5_wiki/data/raw/wiki_corpus.subsample.txt
 output_dir: t5_wiki
 processed_dir: t5_wiki/data/processed
 raw_dir: t5_wiki/data/raw
-
-# Tokenization / chunking
 model_name: t5-base
 max_length: 256
 block_size: 256
-
-# Training
-batch_size: 16
+tokenized_dir: t5_wiki/data/tokenized
+# Parallelism for preprocessing and dataloading
+num_proc: 4
+dataloader_num_workers: 4
+batch_size: 8  # Reduced for RTX 3070 Laptop (8GB VRAM)
+# Speed optimizations
+gradient_accumulation_steps: 8  # Effective batch = 8 * 8 = 64 (same total)
+per_device_eval_batch_size: 16  # Moderate eval batches
+eval_accumulation_steps: 4  # Accumulate eval to avoid memory issues
 epochs: 1
 learning_rate: 1e-4
 noise_density: 0.25
 mean_span_length: 5
 mixed_precision: true
 val_size: 2000
-max_steps: 115000  # Full epoch over 1.83M Wikipedia passages (1,830,018 / 16 batch_size)
-
-# Strategy
-strategy: auto  # auto | mirrored | multiworker
-
-# Logging & checkpoints
+max_steps: 115000
+strategy: auto
 log_dir: t5_wiki/logs
 ckpt_dir: t5_wiki/logs/checkpoints
 save_interval: 1000
-
-# Visualization & Tracking
 use_wandb: true
 run_name: t5-wiki-pytorch
